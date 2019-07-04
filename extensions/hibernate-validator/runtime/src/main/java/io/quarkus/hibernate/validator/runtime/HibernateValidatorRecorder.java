@@ -44,7 +44,8 @@ public class HibernateValidatorRecorder {
                 configuration
                         .initializeBeanMetaData(classesToBeValidated)
                         .initializeLocales(localesToInitialize)
-                        .beanMetaDataClassNormalizer(new ArcProxyBeanMetaDataClassNormalizer());
+                        .beanMetaDataClassNormalizer(new ArcProxyBeanMetaDataClassNormalizer())
+                        .constraintValidatorFactory(new ArcConstraintValidatorFactoryImpl());
 
                 ValidatorFactory validatorFactory = configuration.buildValidatorFactory();
                 ValidatorHolder.initialize(validatorFactory);
