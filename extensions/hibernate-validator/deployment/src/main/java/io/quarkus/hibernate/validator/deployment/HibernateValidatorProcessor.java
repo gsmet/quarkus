@@ -4,8 +4,13 @@ import static io.quarkus.deployment.annotations.ExecutionTime.STATIC_INIT;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.function.Predicate;
 
@@ -28,12 +33,15 @@ import org.jboss.jandex.ClassInfo;
 import org.jboss.jandex.DotName;
 import org.jboss.jandex.IndexView;
 import org.jboss.jandex.Type;
+import org.jboss.logging.Logger;
 
 import io.quarkus.arc.deployment.AdditionalBeanBuildItem;
 import io.quarkus.arc.deployment.AnnotationsTransformerBuildItem;
+import io.quarkus.arc.deployment.BeanArchiveIndexBuildItem;
 import io.quarkus.arc.deployment.BeanContainerListenerBuildItem;
 import io.quarkus.arc.deployment.UnremovableBeanBuildItem;
 import io.quarkus.arc.processor.BeanInfo;
+import io.quarkus.arc.processor.BuiltinScope;
 import io.quarkus.deployment.annotations.BuildProducer;
 import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.annotations.Record;
@@ -46,11 +54,14 @@ import io.quarkus.deployment.builditem.substrate.ReflectiveMethodBuildItem;
 import io.quarkus.deployment.builditem.substrate.SubstrateConfigBuildItem;
 import io.quarkus.deployment.logging.LogCleanupFilterBuildItem;
 import io.quarkus.deployment.recording.RecorderContext;
+import io.quarkus.deployment.util.JandexUtil;
 import io.quarkus.hibernate.validator.runtime.HibernateValidatorRecorder;
 import io.quarkus.hibernate.validator.runtime.ValidatorProvider;
 import io.quarkus.hibernate.validator.runtime.interceptor.MethodValidationInterceptor;
 
 class HibernateValidatorProcessor {
+
+    private static final Logger LOG = Logger.getLogger(HibernateValidatorProcessor.class);
 
     private static final DotName CONSTRAINT_VALIDATOR_FACTORY = DotName
             .createSimple(ConstraintValidatorFactory.class.getName());
@@ -111,6 +122,7 @@ class HibernateValidatorProcessor {
             BuildProducer<ReflectiveMethodBuildItem> reflectiveMethods,
             BuildProducer<AnnotationsTransformerBuildItem> annotationsTransformers,
             CombinedIndexBuildItem combinedIndexBuildItem,
+            BeanArchiveIndexBuildItem beanArchiveIndexBuildItem,
             BuildProducer<FeatureBuildItem> feature,
             BuildProducer<BeanContainerListenerBuildItem> beanContainerListener,
             ShutdownContextBuildItem shutdownContext) throws Exception {
@@ -177,8 +189,8 @@ class HibernateValidatorProcessor {
         }
 
         beanContainerListener
-                .produce(new BeanContainerListenerBuildItem(
-                        recorder.initializeValidatorFactory(classesToBeValidated, shutdownContext)));
+                .produce(new BeanContainerListenerBuildItem(recorder.initializeValidatorFactory(classesToBeValidated,
+                        getConstraintValidatorBeans(beanArchiveIndexBuildItem.getIndex(), recorderContext), shutdownContext)));
     }
 
     @BuildStep
@@ -229,6 +241,44 @@ class HibernateValidatorProcessor {
         if (className != null) {
             contributeClass(classNamesCollector, indexView, className);
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<Class<? extends Annotation>, Collection<Class<? extends ConstraintValidator<?, ?>>>> getConstraintValidatorBeans(
+            IndexView beanArchiveIndex, RecorderContext recorderContext) {
+        // We will register automatically the ConstraintValidator beans in Hibernate Validator
+        Map<DotName, Collection<Class<? extends ConstraintValidator<?, ?>>>> constraintAnnotationBeanMapping = new HashMap<>();
+
+        for (ClassInfo constraintValidator : beanArchiveIndex.getAllKnownImplementors(CONSTRAINT_VALIDATOR)) {
+            if (!BuiltinScope.isDeclaredOn(constraintValidator)) {
+                // this is not a bean, skipping
+                continue;
+            }
+
+            try {
+                List<Type> typeParameters = JandexUtil.resolveTypeParameters(constraintValidator.name(), CONSTRAINT_VALIDATOR,
+                        beanArchiveIndex);
+                DotName constraintAnnotation = typeParameters.get(0).name();
+
+                Collection<Class<? extends ConstraintValidator<?, ?>>> annotationConstraintValidators = constraintAnnotationBeanMapping
+                        .computeIfAbsent(constraintAnnotation, a -> new ArrayList<>());
+
+                annotationConstraintValidators.add((Class<? extends ConstraintValidator<?, ?>>) recorderContext
+                        .classProxy(constraintValidator.name().toString()));
+            } catch (IllegalStateException e) {
+                LOG.warnf("Unable to determine the constraint type of bean constraint validator %s",
+                        constraintValidator.name());
+            }
+        }
+
+        Map<Class<? extends Annotation>, Collection<Class<? extends ConstraintValidator<?, ?>>>> constraintValidatorBeans = new HashMap<>();
+        for (Entry<DotName, Collection<Class<? extends ConstraintValidator<?, ?>>>> constraintEntry : constraintAnnotationBeanMapping
+                .entrySet()) {
+            constraintValidatorBeans.put(
+                    (Class<? extends Annotation>) recorderContext.classProxy(constraintEntry.getKey().toString()),
+                    constraintEntry.getValue());
+        }
+        return constraintValidatorBeans;
     }
 
     private static DotName getClassName(Type type) {

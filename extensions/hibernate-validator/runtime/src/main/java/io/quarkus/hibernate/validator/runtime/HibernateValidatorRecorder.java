@@ -1,11 +1,16 @@
 package io.quarkus.hibernate.validator.runtime;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import javax.validation.ClockProvider;
+import javax.validation.ConstraintValidator;
 import javax.validation.ConstraintValidatorFactory;
 import javax.validation.MessageInterpolator;
 import javax.validation.ParameterNameProvider;
@@ -16,6 +21,8 @@ import javax.validation.valueextraction.ValueExtractor;
 
 import org.hibernate.validator.PredefinedScopeHibernateValidator;
 import org.hibernate.validator.PredefinedScopeHibernateValidatorConfiguration;
+import org.hibernate.validator.cfg.ConstraintMapping;
+import org.hibernate.validator.cfg.context.ConstraintDefinitionContext;
 import org.hibernate.validator.messageinterpolation.ParameterMessageInterpolator;
 
 import io.quarkus.arc.Arc;
@@ -28,8 +35,11 @@ import io.quarkus.runtime.annotations.Recorder;
 @Recorder
 public class HibernateValidatorRecorder {
 
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     public BeanContainerListener initializeValidatorFactory(Set<Class<?>> classesToBeValidated,
+            Map<Class<? extends Annotation>, Collection<Class<? extends ConstraintValidator<?, ?>>>> constraintValidatorBeans,
             ShutdownContext shutdownContext) {
+
         BeanContainerListener beanContainerListener = new BeanContainerListener() {
 
             @Override
@@ -90,6 +100,24 @@ public class HibernateValidatorRecorder {
                 for (ValueExtractor<?> valueExtractor : Arc.container().beanManager().createInstance()
                         .select(ValueExtractor.class)) {
                     configuration.addValueExtractor(valueExtractor);
+                }
+
+                // Automatically add all constraint validators declared as beans
+                if (!constraintValidatorBeans.isEmpty()) {
+                    ConstraintMapping constraintMapping = configuration.createConstraintMapping();
+
+                    for (Entry<Class<? extends Annotation>, Collection<Class<? extends ConstraintValidator<?, ?>>>> constraintValidatorBeansEntry : constraintValidatorBeans
+                            .entrySet()) {
+                        ConstraintDefinitionContext context = constraintMapping
+                                .constraintDefinition(constraintValidatorBeansEntry.getKey())
+                                .includeExistingValidators(true);
+                        for (Class<? extends ConstraintValidator<?, ?>> constraintValidatorBeanClass : constraintValidatorBeansEntry
+                                .getValue()) {
+                            context.validatedBy(constraintValidatorBeanClass);
+                        }
+                    }
+
+                    configuration.addMapping(constraintMapping);
                 }
 
                 ValidatorFactory validatorFactory = configuration.buildValidatorFactory();
