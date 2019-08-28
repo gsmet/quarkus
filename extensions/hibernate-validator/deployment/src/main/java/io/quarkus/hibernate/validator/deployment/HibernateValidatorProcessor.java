@@ -4,9 +4,13 @@ import static io.quarkus.deployment.annotations.ExecutionTime.STATIC_INIT;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
+import java.util.ArrayDeque;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.BiFunction;
 import java.util.function.Predicate;
 
 import javax.validation.ClockProvider;
@@ -30,6 +34,7 @@ import org.jboss.jandex.ClassInfo;
 import org.jboss.jandex.DotName;
 import org.jboss.jandex.IndexView;
 import org.jboss.jandex.Type;
+import org.objectweb.asm.ClassVisitor;
 
 import io.quarkus.arc.deployment.AdditionalBeanBuildItem;
 import io.quarkus.arc.deployment.AnnotationsTransformerBuildItem;
@@ -39,12 +44,11 @@ import io.quarkus.arc.processor.BeanInfo;
 import io.quarkus.deployment.annotations.BuildProducer;
 import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.annotations.Record;
+import io.quarkus.deployment.builditem.BytecodeTransformerBuildItem;
 import io.quarkus.deployment.builditem.CombinedIndexBuildItem;
 import io.quarkus.deployment.builditem.FeatureBuildItem;
 import io.quarkus.deployment.builditem.HotDeploymentWatchedFileBuildItem;
 import io.quarkus.deployment.builditem.ShutdownContextBuildItem;
-import io.quarkus.deployment.builditem.substrate.ReflectiveFieldBuildItem;
-import io.quarkus.deployment.builditem.substrate.ReflectiveMethodBuildItem;
 import io.quarkus.deployment.builditem.substrate.SubstrateConfigBuildItem;
 import io.quarkus.deployment.logging.LogCleanupFilterBuildItem;
 import io.quarkus.deployment.recording.RecorderContext;
@@ -112,12 +116,11 @@ class HibernateValidatorProcessor {
     @BuildStep
     @Record(STATIC_INIT)
     public void build(HibernateValidatorRecorder recorder, RecorderContext recorderContext,
-            BuildProducer<ReflectiveFieldBuildItem> reflectiveFields,
-            BuildProducer<ReflectiveMethodBuildItem> reflectiveMethods,
             BuildProducer<AnnotationsTransformerBuildItem> annotationsTransformers,
             CombinedIndexBuildItem combinedIndexBuildItem,
             BuildProducer<FeatureBuildItem> feature,
             BuildProducer<BeanContainerListenerBuildItem> beanContainerListener,
+            BuildProducer<BytecodeTransformerBuildItem> bytecodeTransformer,
             ShutdownContextBuildItem shutdownContext) throws Exception {
 
         feature.produce(new FeatureBuildItem(FeatureBuildItem.HIBERNATE_VALIDATOR));
@@ -148,13 +151,11 @@ class HibernateValidatorProcessor {
             for (AnnotationInstance annotation : annotationInstances) {
                 if (annotation.target().kind() == AnnotationTarget.Kind.FIELD) {
                     contributeClass(classNamesToBeValidated, indexView, annotation.target().asField().declaringClass().name());
-                    reflectiveFields.produce(new ReflectiveFieldBuildItem(annotation.target().asField()));
                     contributeClassMarkedForCascadingValidation(classNamesToBeValidated, indexView, consideredAnnotation,
                             annotation.target().asField().type());
                 } else if (annotation.target().kind() == AnnotationTarget.Kind.METHOD) {
                     contributeClass(classNamesToBeValidated, indexView, annotation.target().asMethod().declaringClass().name());
                     // we need to register the method for reflection as it could be a getter
-                    reflectiveMethods.produce(new ReflectiveMethodBuildItem(annotation.target().asMethod()));
                     contributeClassMarkedForCascadingValidation(classNamesToBeValidated, indexView, consideredAnnotation,
                             annotation.target().asMethod().returnType());
                 } else if (annotation.target().kind() == AnnotationTarget.Kind.METHOD_PARAMETER) {
@@ -167,7 +168,6 @@ class HibernateValidatorProcessor {
                                     .get(annotation.target().asMethodParameter().position()));
                 } else if (annotation.target().kind() == AnnotationTarget.Kind.CLASS) {
                     contributeClass(classNamesToBeValidated, indexView, annotation.target().asClass().name());
-                    // no need for reflection in the case of a class level constraint
                 }
             }
         }
@@ -179,6 +179,20 @@ class HibernateValidatorProcessor {
         Set<Class<?>> classesToBeValidated = new HashSet<>();
         for (DotName className : classNamesToBeValidated) {
             classesToBeValidated.add(recorderContext.classProxy(className.toString()));
+        }
+
+        Map<DotName, ClassInfo> classesToBeInstrumented = getClassesToBeInstrumented(indexView, classNamesToBeValidated);
+        Set<DotName> classNamesToBeInstrumented = classesToBeInstrumented.keySet();
+        for (ClassInfo classToBeInstrumented : classesToBeInstrumented.values()) {
+            bytecodeTransformer.produce(new BytecodeTransformerBuildItem(classToBeInstrumented.name().toString(),
+                    new BiFunction<String, ClassVisitor, ClassVisitor>() {
+
+                        @Override
+                        public ClassVisitor apply(String name, ClassVisitor cv) {
+                            return new HibernateValidatorEnhancedBeanClassVisitor(cv, indexView, classToBeInstrumented,
+                                    classNamesToBeInstrumented);
+                        }
+                    }));
         }
 
         beanContainerListener
@@ -236,6 +250,33 @@ class HibernateValidatorProcessor {
         }
     }
 
+    private Map<DotName, ClassInfo> getClassesToBeInstrumented(IndexView indexView, Set<DotName> classNamesToBeValidated) {
+        Map<DotName, ClassInfo> classesToBeInstrumented = new HashMap<DotName, ClassInfo>();
+        for (DotName classNameToBeValidated : classNamesToBeValidated) {
+            ClassInfo classToBeValidated = indexView.getClassByName(classNameToBeValidated);
+            if (classToBeValidated == null) {
+                // while constrained classes are always indexed, we might have unindexed cascaded classes
+                continue;
+            }
+
+            classesToBeInstrumented.put(classNameToBeValidated, classToBeValidated);
+
+            ArrayDeque<ClassInfo> indexedSuperClasses = getIndexedClassHierarchy(indexView, classToBeValidated);
+            ClassInfo superClass;
+            while ((superClass = indexedSuperClasses.peekLast()) != null) {
+                // as soon as one element of the hierarchy is constrained, we instrument this class and all its subclasses
+                if (classNamesToBeValidated.contains(superClass.name())) {
+                    for (ClassInfo remainingSuperClass : indexedSuperClasses) {
+                        classesToBeInstrumented.putIfAbsent(remainingSuperClass.name(), remainingSuperClass);
+                    }
+                    break;
+                }
+                indexedSuperClasses.removeLast();
+            }
+        }
+        return classesToBeInstrumented;
+    }
+
     private static DotName getClassName(Type type) {
         switch (type.kind()) {
             case CLASS:
@@ -246,6 +287,30 @@ class HibernateValidatorProcessor {
             default:
                 return null;
         }
+    }
+
+    private static ArrayDeque<ClassInfo> getIndexedClassHierarchy(IndexView indexView, ClassInfo clazz) {
+        ArrayDeque<ClassInfo> classHierarchy = new ArrayDeque<>();
+
+        if (clazz == null) {
+            return classHierarchy;
+        }
+
+        classHierarchy.add(clazz);
+
+        DotName currentClassName = clazz.superName();
+
+        while (currentClassName != null) {
+            ClassInfo currentClass = indexView.getClassByName(currentClassName);
+            if (currentClass == null) {
+                break;
+            }
+
+            classHierarchy.add(currentClass);
+            currentClassName = currentClass.superName();
+        }
+
+        return classHierarchy;
     }
 
     private static boolean isResteasyInClasspath() {

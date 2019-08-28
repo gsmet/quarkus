@@ -23,10 +23,12 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import org.hibernate.validator.constraints.Length;
+import org.hibernate.validator.engine.HibernateValidatorEnhancedBean;
 
 import io.quarkus.it.hibernate.validator.custom.MyOtherBean;
 import io.quarkus.it.hibernate.validator.injection.InjectedConstraintValidatorConstraint;
 import io.quarkus.it.hibernate.validator.injection.MyService;
+import io.quarkus.it.hibernate.validator.instrumentation.ChildClass;
 
 @Path("/hibernate-validator/test")
 public class HibernateValidatorTestResource {
@@ -120,6 +122,48 @@ public class HibernateValidatorTestResource {
 
         result.append(formatViolations(validator.validate(new BeanWithInjectedConstraintValidatorConstraint("Invalid value"))));
 
+        return result.build();
+    }
+
+    @GET
+    @Path("/instrumentation")
+    @Produces(MediaType.TEXT_PLAIN)
+    public String testInstrumentation() {
+        ChildClass child = ChildClass.valid();
+
+        if (!(child instanceof HibernateValidatorEnhancedBean)) {
+            return "child is not an instance of HibernateValidatorEnhancedBean";
+        }
+
+        HibernateValidatorEnhancedBean enhancedBean = (HibernateValidatorEnhancedBean) child;
+
+        if (!child.longObject.equals(enhancedBean.$$_hibernateValidator_getFieldValue("longObject"))) {
+            return "longObject different from enhancedBean.$$_hibernateValidator_getFieldValue(\"longObject\")";
+        }
+        if (child.primitiveLong != ((Long) enhancedBean.$$_hibernateValidator_getFieldValue("primitiveLong")).longValue()) {
+            return "primitiveLong different from enhancedBean.$$_hibernateValidator_getFieldValue(\"primitiveLong\")";
+        }
+        if (!child.getString().equals(enhancedBean.$$_hibernateValidator_getGetterValue("getString"))) {
+            return "getString() different from enhancedBean.$$_hibernateValidator_getGetterValue(\"getString\")";
+        }
+        if (child.getPrimitiveLong() != ((Long) enhancedBean.$$_hibernateValidator_getGetterValue("getPrimitiveLong"))
+                .longValue()) {
+            return "getPrimitiveLong() different from enhancedBean.$$_hibernateValidator_getGetterValue(\"getPrimitiveLong\")";
+        }
+        if (!child.grandParentString.equals(enhancedBean.$$_hibernateValidator_getFieldValue("grandParentString"))) {
+            return "grandParentString different from enhancedBean.$$_hibernateValidator_getFieldValue(\"grandParentString\")";
+        }
+
+        return "OK";
+    }
+
+    @GET
+    @Path("/hierarchy")
+    @Produces(MediaType.TEXT_PLAIN)
+    public String testHierarchy() {
+        ResultBuilder result = new ResultBuilder();
+        result.append(formatViolations(validator.validate(ChildClass.valid())));
+        result.append(formatViolations(validator.validate(ChildClass.invalid())));
         return result.build();
     }
 

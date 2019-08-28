@@ -89,4 +89,30 @@ public class HibernateValidatorFunctionalityTest {
                 .then()
                 .body(is(expected.toString()));
     }
+
+    @Test
+    public void testInstrumentation() {
+        RestAssured.when()
+                .get("/hibernate-validator/test/instrumentation")
+                .then()
+                .body(containsString("OK"));
+    }
+
+    @Test
+    public void testHierarchy() {
+        StringBuilder expected = new StringBuilder();
+        expected.append("passed").append("\n")
+                .append("failed: ")
+                .append("grandParentString (must match \"hello\")").append(", ")
+                .append("grandParentString (must not be blank)").append(", ")
+                .append("longObject (must not be null)").append(", ")
+                .append("primitiveLong (must be greater than or equal to 4)").append(", ")
+                .append("primitiveLong (must be greater than or equal to 5)").append(", ")
+                .append("string (must not be blank)");
+
+        RestAssured.when()
+                .get("/hibernate-validator/test/hierarchy")
+                .then()
+                .body(is(expected.toString()));
+    }
 }
