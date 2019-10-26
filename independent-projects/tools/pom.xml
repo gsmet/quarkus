@@ -41,6 +41,8 @@
         <eclipse-minimal-json.version>0.9.5</eclipse-minimal-json.version>
         <jackson.version>2.9.10</jackson.version>
         <jakarta.enterprise.cdi-api.version>2.0.2</jakarta.enterprise.cdi-api.version>
+        <jakarta.servlet-api.version>4.0.3</jakarta.servlet-api.version>
+        <jakarta.websocket-api.version>1.1.2</jakarta.websocket-api.version>
         <junit.version>5.5.2</junit.version>
         <jboss-logging.version>3.3.2.Final</jboss-logging.version>
         <maven-core.version>3.5.4</maven-core.version>
@@ -96,6 +98,16 @@
                 <groupId>jakarta.enterprise</groupId>
                 <artifactId>jakarta.enterprise.cdi-api</artifactId>
                 <version>${jakarta.enterprise.cdi-api.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>jakarta.servlet</groupId>
+                <artifactId>jakarta.servlet-api</artifactId>
+                <version>${jakarta.servlet-api.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>jakarta.websocket</groupId>
+                <artifactId>jakarta.websocket-api</artifactId>
+                <version>${jakarta.websocket-api.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.maven</groupId>
@@ -159,20 +171,24 @@
                             <rules>
                                 <bannedDependencies>
                                     <excludes>
-                                        <!-- Use javax.annotation-api -->
-                                        <exclude>org.jboss.spec.javax.annotation:jboss-annotations-api_1.2_spec
-                                        </exclude>
-                                        <exclude>org.jboss.spec.javax.annotation:jboss-annotations-api_1.3_spec
-                                        </exclude>
+                                        <!-- Use Jakarta artifacts -->
+                                        <exclude>org.jboss.spec.javax.annotation:jboss-annotations-api_1.2_spec</exclude>
+                                        <exclude>org.jboss.spec.javax.annotation:jboss-annotations-api_1.3_spec</exclude>
+                                        <exclude>org.jboss.spec.javax.transaction:jboss-transaction-api_1.2_spec</exclude>
+                                        <exclude>org.jboss.spec.javax.transaction:jboss-transaction-api_1.3_spec</exclude>
+                                        <exclude>org.jboss.spec.javax.servlet:jboss-servlet-api_4.0_spec</exclude>
+                                        <exclude>org.jboss.spec.javax.security.jacc:jboss-jacc-api_1.5_spec</exclude>
+                                        <exclude>org.jboss.spec.javax.security.auth.message:jboss-jaspi-api_1.1_spec</exclude>
+                                        <exclude>org.jboss.spec.javax.ws.rs:jboss-jaxrs-api_2.1_spec</exclude>
+                                        <exclude>org.jboss.spec.javax.xml.bind:jboss-jaxb-api_2.3_spec</exclude>
+                                        <exclude>org.jboss.spec.javax.websocket:jboss-websocket-api_1.1_spec</exclude>
+                                        <exclude>org.jboss.spec.javax.interceptor:jboss-interceptors-api_1.2_spec</exclude>
                                         <!-- use our jboss-logmanager -->
                                         <exclude>org.jboss.logging:jboss-logmanager</exclude>
                                         <!-- We don't want all the API's in one jar-->
                                         <exclude>javax:javaee-api</exclude>
                                         <!-- Prevent incompatible config from coming in -->
                                         <exclude>org.wildfly.client:wildfly-client-config</exclude>
-                                        <!-- Use Jakarta Activation -->
-                                        <exclude>javax.activation:javax-activation-api</exclude>
-                                        <exclude>javax.activation:activation</exclude>
                                         <exclude>org.jboss.marshalling:jboss-marshalling-osgi</exclude>
                                         <exclude>org.jboss.spec.javax.servlet:jboss-servlet-api_3.1_spec</exclude>
                                         <!-- The API is packaged by the implementation-->
