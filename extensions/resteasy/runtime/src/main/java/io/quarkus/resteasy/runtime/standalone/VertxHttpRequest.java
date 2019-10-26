@@ -41,6 +41,7 @@ public class VertxHttpRequest extends BaseHttpRequest {
     protected ResteasyHttpHeaders httpHeaders;
     protected SynchronousDispatcher dispatcher;
     protected String httpMethod;
+    protected String remoteHost;
     protected InputStream inputStream;
     protected Map<String, Object> attributes = new HashMap<String, Object>();
     protected VertxHttpResponse response;
@@ -53,6 +54,7 @@ public class VertxHttpRequest extends BaseHttpRequest {
             ResteasyHttpHeaders httpHeaders,
             ResteasyUriInfo uri,
             String httpMethod,
+            String remoteHost,
             SynchronousDispatcher dispatcher,
             VertxHttpResponse response,
             boolean is100ContinueExpected) {
@@ -63,6 +65,7 @@ public class VertxHttpRequest extends BaseHttpRequest {
         this.dispatcher = dispatcher;
         this.httpHeaders = httpHeaders;
         this.httpMethod = httpMethod;
+        this.remoteHost = remoteHost;
         this.executionContext = new VertxExecutionContext(this, response, dispatcher);
     }
 
@@ -121,6 +124,17 @@ public class VertxHttpRequest extends BaseHttpRequest {
     @Override
     public HttpHeaders getHttpHeaders() {
         return httpHeaders;
+    }
+
+    @Override
+    public String getRemoteHost() {
+        return remoteHost;
+    }
+
+    @Override
+    public String getRemoteAddress() {
+        // TODO: check if there is a way to get the remote address properly
+        return remoteHost;
     }
 
     @Override
