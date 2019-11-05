@@ -41,7 +41,7 @@ public class QuarkusSmallRyeTracingDynamicFeature implements DynamicFeature {
             if ("http-path".equalsIgnoreCase(operationNameProvider.get())) {
                 builder.withOperationNameProvider(OperationNameProvider.WildcardOperationName.newBuilder());
             } else if (!"class-method".equalsIgnoreCase(operationNameProvider.get())) {
-                logger.warning("Provided operation name does not match http-path or class-method. Using default class-method.");
+                logger.warn("Provided operation name does not match http-path or class-method. Using default class-method.");
             }
         }
         this.delegate = builder.build();
