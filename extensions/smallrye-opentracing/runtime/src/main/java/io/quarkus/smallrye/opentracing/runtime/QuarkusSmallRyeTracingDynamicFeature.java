@@ -1,7 +1,6 @@
 package io.quarkus.smallrye.opentracing.runtime;
 
 import java.util.Optional;
-import java.util.logging.Logger;
 
 import javax.enterprise.inject.spi.CDI;
 import javax.ws.rs.container.DynamicFeature;
@@ -11,6 +10,7 @@ import javax.ws.rs.ext.Provider;
 
 import org.eclipse.microprofile.config.Config;
 import org.eclipse.microprofile.config.ConfigProvider;
+import org.jboss.logging.Logger;
 
 import io.opentracing.Tracer;
 import io.opentracing.contrib.jaxrs2.server.OperationNameProvider;
