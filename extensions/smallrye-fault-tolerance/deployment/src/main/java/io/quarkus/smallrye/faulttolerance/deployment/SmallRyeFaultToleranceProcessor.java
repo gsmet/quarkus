@@ -213,7 +213,8 @@ public class SmallRyeFaultToleranceProcessor {
                 // no need to log the strategy if it is the default
                 "Hystrix concurrency strategy used: DefaultHystrixConcurrencyStrategy"));
         logCleanupFilter.produce(new LogCleanupFilterBuildItem("io.smallrye.faulttolerance.DefaultHystrixConcurrencyStrategy",
-                "### Privilleged Thread Factory used ###"));
+                "### Privilleged Thread Factory used ###",
+                "### Context Thread Factory used ###"));
 
         logCleanupFilter.produce(new LogCleanupFilterBuildItem("com.netflix.config.sources.URLConfigurationSource",
                 "No URLs will be polled as dynamic configuration sources.",
