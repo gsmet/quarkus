@@ -38,6 +38,11 @@ public final class DatabaseKind {
         }
 
         String lowerCaseValue = value.toLowerCase(Locale.ROOT).trim();
+
+        if (lowerCaseValue.isEmpty()) {
+            return null;
+        }
+
         String supportedValue = ALIASES.get(lowerCaseValue);
         if (supportedValue != null) {
             return supportedValue;

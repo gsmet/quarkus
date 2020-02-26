@@ -2,13 +2,14 @@ package io.quarkus.datasource.common.test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
 import io.quarkus.datasource.common.runtime.DatabaseKind;
 
-public class TestDatabaseKind {
+public class DatabaseKindTest {
 
     @Test
     public void testNormalize() {
@@ -21,6 +22,8 @@ public class TestDatabaseKind {
         assertEquals(DatabaseKind.POSTGRESQL, DatabaseKind.normalize("Postgresql"));
         assertEquals(DatabaseKind.POSTGRESQL, DatabaseKind.normalize("pg"));
         assertEquals(DatabaseKind.POSTGRESQL, DatabaseKind.normalize("pgsql"));
+
+        assertNull(DatabaseKind.normalize("   "));
     }
 
     @Test
