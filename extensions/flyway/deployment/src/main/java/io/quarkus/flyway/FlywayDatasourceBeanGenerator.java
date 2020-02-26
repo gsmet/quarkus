@@ -1,7 +1,6 @@
 package io.quarkus.flyway;
 
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.stream.Collectors;
 
 import javax.enterprise.context.ApplicationScoped;
@@ -135,6 +134,7 @@ class FlywayDatasourceBeanGenerator {
 
     @Override
     public String toString() {
-        return "FlywayDatasourceBeanGenerator [dataSourceNames=" + namedDataSourceNames + ", generatedBean=" + generatedBean + "]";
+        return "FlywayDatasourceBeanGenerator [dataSourceNames=" + namedDataSourceNames + ", generatedBean=" + generatedBean
+                + "]";
     }
 }
