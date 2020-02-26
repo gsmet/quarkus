@@ -85,7 +85,7 @@ class FlywayProcessor {
 
         Collection<String> dataSourceNames = jdbcDataSourceBuildItems.stream()
                 .map(i -> i.getName())
-                .collect(Collectors.toList());
+                .collect(Collectors.toSet());
         new FlywayDatasourceBeanGenerator(dataSourceNames, generatedBeanBuildItem).createFlywayProducerBean();
 
         registerNativeImageResources(resourceProducer, generatedResourceProducer,
@@ -115,7 +115,7 @@ class FlywayProcessor {
         // schema is "ready"
         Collection<String> dataSourceNames = jdbcDataSourceBuildItems.stream()
                 .map(i -> i.getName())
-                .collect(Collectors.toList());
+                .collect(Collectors.toSet());
         schemaReadyBuildItem.produce(new JdbcDataSourceSchemaReadyBuildItem(dataSourceNames));
         return new ServiceStartBuildItem("flyway");
     }
