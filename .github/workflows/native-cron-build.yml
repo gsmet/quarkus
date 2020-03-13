@@ -1,12 +1,12 @@
 name: "Quarkus CI - Nightly Native Build"
 on:
+  push:
   schedule:
     - cron: '0 2 * * *'
   repository_dispatch:
 
 jobs:
   build:
-    if: github.repository == 'quarkusio/quarkus'
     runs-on: ubuntu-18.04
     strategy:
       fail-fast: false
