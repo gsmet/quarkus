@@ -11,14 +11,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        category: [ "GraalVM 19.3.1 - Java 8", "GraalVM 20.0.0 - Java 11" ]
+        category: [ "GraalVM 19.3.1 - Java 8", "GraalVM 20.0.0 - Java 8" ]
         include:
           - category: "GraalVM 19.3.1 - Java 8"
             graalvm: "19.3.1"
             java: 8
-          - category: "GraalVM 20.0.0 - Java 11"
+          - category: "GraalVM 20.0.0 - Java 8"
             graalvm: "20.0.0"
-            java: 11
+            java: 8
     name: Test
     steps:
 
