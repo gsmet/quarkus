@@ -1,6 +1,5 @@
 name: "Quarkus CI - Nightly Native Build"
 on:
-  push:
   schedule:
     - cron: '0 2 * * *'
   repository_dispatch:

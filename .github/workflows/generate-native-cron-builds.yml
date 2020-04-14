@@ -1,0 +1,32 @@
+name: "Quarkus CI - Generate Nightly Builds"
+on:
+  push:
+  schedule:
+    - cron: '0 2 * * *'
+  repository_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+    strategy:
+      fail-fast: false
+      matrix:
+        category: [ "GraalVM 19.3.1 - Java 8", "GraalVM 20.0.0 - Java 11" ]
+        include:
+          - category: "GraalVM 19.3.1 - Java 8"
+            graalvm: "19.3.1"
+            java: 8
+            schedule: "0 2 * * *"
+          - category: "GraalVM 20.0.0 - Java 11"
+            graalvm: "20.0.0"
+            java: 11
+            schedule: "0 4 * * *"
+    name: Generate ${{ matrix.category }} build file
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install yq
+        run: sudo snap install yq
+      - name: Generate build file
+        run: |
+          cd .github/workflows
+          ./generate-native-cron-build.sh "${{ matrix.graalvm }}" "${{ matrix.java }}" "${{ matrix.schedule }}"
