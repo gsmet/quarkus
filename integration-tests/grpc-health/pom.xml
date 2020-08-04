@@ -14,10 +14,6 @@
     <artifactId>quarkus-integration-test-grpc-health</artifactId>
     <name>Quarkus - Integration Tests - gRPC - Health</name>
 
-    <properties>
-        <skipTests>true</skipTests>
-    </properties>
-
     <dependencies>
         <dependency>
             <groupId>io.quarkus</groupId>
