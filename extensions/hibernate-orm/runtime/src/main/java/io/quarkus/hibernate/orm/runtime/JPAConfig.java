@@ -3,7 +3,6 @@ package io.quarkus.hibernate.orm.runtime;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.annotation.PreDestroy;
@@ -22,8 +21,6 @@ public class JPAConfig {
 
     private static final Logger LOGGER = Logger.getLogger(JPAConfig.class.getName());
 
-    private final AtomicBoolean jtaEnabled;
-
     private final AtomicReference<MultiTenancyStrategy> multiTenancyStrategy;
 
     private final AtomicReference<String> multiTenancySchemaDataSource;
@@ -33,20 +30,15 @@ public class JPAConfig {
     private final AtomicReference<String> defaultPersistenceUnitName;
 
     public JPAConfig() {
-        this.jtaEnabled = new AtomicBoolean();
         this.multiTenancyStrategy = new AtomicReference<MultiTenancyStrategy>();
         this.multiTenancySchemaDataSource = new AtomicReference<String>();
         this.persistenceUnits = new ConcurrentHashMap<>();
         this.defaultPersistenceUnitName = new AtomicReference<String>();
     }
 
-    void setJtaEnabled(boolean value) {
-        jtaEnabled.set(value);
-    }
-
     /**
      * Sets the strategy for multitenancy.
-     * 
+     *
      * @param strategy Strategy to use.
      */
     void setMultiTenancyStrategy(MultiTenancyStrategy strategy) {
@@ -55,7 +47,7 @@ public class JPAConfig {
 
     /**
      * Sets the name of the data source that should be used in case of {@link MultiTenancyStrategy#SCHEMA} approach.
-     * 
+     *
      * @param dataSourceName Name to use or {@literal null} for the default data source.
      */
     void setMultiTenancySchemaDataSource(String dataSourceName) {
@@ -63,15 +55,6 @@ public class JPAConfig {
     }
 
     public EntityManagerFactory getEntityManagerFactory(String unitName) {
-        if (unitName == null || unitName.isEmpty()) {
-            if (persistenceUnits.size() == 1) {
-                String defaultUnitName = defaultPersistenceUnitName.get();
-                return defaultUnitName != null ? persistenceUnits.get(defaultUnitName).get()
-                        : persistenceUnits.values().iterator().next().get();
-            } else {
-                throw new IllegalStateException("Unable to identify the default PU: " + persistenceUnits);
-            }
-        }
         return persistenceUnits.get(unitName).get();
     }
 
@@ -85,14 +68,22 @@ public class JPAConfig {
         }
     }
 
-    void initDefaultPersistenceUnit() {
-        if (persistenceUnits.size() == 1) {
-            defaultPersistenceUnitName.set(persistenceUnits.keySet().iterator().next());
+    public EntityManagerFactory getEntityManagerFactory(String unitName) {
+        LazyPersistenceUnit lazyPersistenceUnit = null;
+        if (unitName == null) {
+            if (persistenceUnits.size() == 1) {
+                lazyPersistenceUnit = persistenceUnits.values().iterator().next();
+            }
+        } else {
+            lazyPersistenceUnit = persistenceUnits.get(unitName);
         }
-    }
 
-    boolean isJtaEnabled() {
-        return jtaEnabled.get();
+        if (lazyPersistenceUnit == null) {
+            throw new IllegalArgumentException(
+                    String.format("Unable to find an EntityManagerFactory for persistence unit '%s'", unitName));
+        }
+
+        return lazyPersistenceUnit.get();
     }
 
     /**
@@ -106,7 +97,7 @@ public class JPAConfig {
 
     /**
      * Returns the selected multitenancy strategy.
-     * 
+     *
      * @return Strategy to use.
      */
     public MultiTenancyStrategy getMultiTenancyStrategy() {
@@ -115,7 +106,7 @@ public class JPAConfig {
 
     /**
      * Determines which data source should be used in case of {@link MultiTenancyStrategy#SCHEMA} approach.
-     * 
+     *
      * @return Data source name or {@link null} in case the default data source should be used.
      */
     public String getMultiTenancySchemaDataSource() {
