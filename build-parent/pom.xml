@@ -952,5 +952,17 @@
             </build>
         </profile>
 
+        <profile>
+            <id>os-windows</id>
+            <activation>
+                <os>
+                    <family>windows</family>
+                </os>
+            </activation>
+            <properties>
+                <os-windows>true</os-windows>
+            </properties>
+        </profile>
+
     </profiles>
 </project>

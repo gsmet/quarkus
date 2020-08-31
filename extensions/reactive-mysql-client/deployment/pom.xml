@@ -215,6 +215,7 @@
                                     <goal>exec</goal>
                                 </goals>
                                 <configuration>
+                                    <skip>${os-windows}</skip>
                                     <executable>${basedir}/../../../.github/docker-prune.sh</executable>
                                 </configuration>
                             </execution>
