@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import javax.ws.rs.BadRequestException;
 import javax.ws.rs.core.Cookie;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
@@ -29,6 +30,10 @@ public class VertxUtil {
 
     public static ResteasyUriInfo extractUriInfo(HttpServerRequest req, String contextPath) {
         String uri = req.absoluteURI();
+        if (uri == null) {
+            throw new BadRequestException("Invalid URI: " + req.uri());
+        }
+
         String protocol = req.scheme();
 
         String uriString;
