@@ -70,9 +70,6 @@ public class ClassComparisonUtil {
                 if (!Objects.equals(i.defaultValue(), method.defaultValue())) {
                     continue;
                 }
-                if (!compareAnnotations(i.annotations(), method.annotations())) {
-                    continue;
-                }
                 boolean paramEqual = true;
                 for (int j = 0; j < method.parameters().size(); ++j) {
                     Type a = method.parameters().get(j);
