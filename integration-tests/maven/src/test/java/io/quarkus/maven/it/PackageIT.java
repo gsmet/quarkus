@@ -57,13 +57,10 @@ public class PackageIT extends MojoTestBase {
 
         assertThat(result.getProcess().waitFor()).isEqualTo(0);
 
-        final File targetDir = getTargetDir();
-        List<File> jars = getFilesEndingWith(targetDir, ".jar");
-        assertThat(jars).hasSize(2);
+        File runnerJar = getTargetDir().toPath().resolve("quarkus-app").resolve("quarkus-run.jar").toFile();
 
         // make sure the jar can be read by JarInputStream
-        ensureManifestOfJarIsReadableByJarInputStream(
-                jars.stream().filter(f -> f.getName().contains("-runner")).findFirst().get());
+        ensureManifestOfJarIsReadableByJarInputStream(runnerJar);
     }
 
     private void ensureManifestOfJarIsReadableByJarInputStream(File jar) throws IOException {
@@ -216,12 +213,12 @@ public class PackageIT extends MojoTestBase {
      * @see <a href="https://github.com/quarkusio/quarkus/issues/4782"/>
      */
     @Test
-    public void testRunnerJarHasValidCRC() throws Exception {
+    public void testLegacyJarHasValidCRC() throws Exception {
         testDir = initProject("projects/uberjar-check", "projects/project-uberjar-false2");
 
         running = new RunningInvoker(testDir, false);
         final MavenProcessInvocationResult result = running.execute(Collections.singletonList("package"),
-                Collections.singletonMap("QUARKUS_PACKAGE_TYPES", "thin-jar"));
+                Collections.singletonMap("QUARKUS_PACKAGE_TYPE", "legacy-jar"));
 
         assertThat(result.getProcess().waitFor()).isEqualTo(0);
 
@@ -229,6 +226,29 @@ public class PackageIT extends MojoTestBase {
         assertThat(getNumberOfFilesEndingWith(targetDir, ".jar")).isEqualTo(2);
 
         final Path runnerJar = targetDir.toPath().resolve("acme-1.0-SNAPSHOT-runner.jar");
+        Assertions.assertTrue(Files.exists(runnerJar), "Runner jar " + runnerJar + " is missing");
+        assertZipEntriesCanBeOpenedAndClosed(runnerJar);
+    }
+
+    /**
+     * Tests that the runner jar created by Quarkus has valid CRC entries. The verification
+     * is pretty trivial and involves opening and closing the ZipEntry entries that are part of the
+     * runner jar. That internally triggers the CRC checks.
+     *
+     * @throws Exception
+     * @see <a href="https://github.com/quarkusio/quarkus/issues/4782"/>
+     */
+    @Test
+    public void testFastJarHasValidCRC() throws Exception {
+        testDir = initProject("projects/uberjar-check", "projects/project-uberjar-false2");
+
+        running = new RunningInvoker(testDir, false);
+        final MavenProcessInvocationResult result = running.execute(Collections.singletonList("package"),
+                Collections.emptyMap());
+
+        assertThat(result.getProcess().waitFor()).isEqualTo(0);
+
+        final Path runnerJar = getTargetDir().toPath().resolve("quarkus-app").resolve("quarkus-run.jar");
         Assertions.assertTrue(Files.exists(runnerJar), "Runner jar " + runnerJar + " is missing");
         assertZipEntriesCanBeOpenedAndClosed(runnerJar);
     }
@@ -242,14 +262,13 @@ public class PackageIT extends MojoTestBase {
 
         running = new RunningInvoker(testDir, false);
         final MavenProcessInvocationResult result = running.execute(Collections.singletonList("package"),
-                Collections.singletonMap("QUARKUS_PACKAGE_TYPES", "thin-jar"));
+                Collections.emptyMap());
 
         assertThat(result.getProcess().waitFor()).isEqualTo(0);
 
         final File targetDir = new File(testDir.getAbsoluteFile(), "runner" + File.separator + "target");
-        assertThat(getNumberOfFilesEndingWith(targetDir, ".jar")).isEqualTo(2);
 
-        final Path runnerJar = targetDir.toPath().resolve("quarkus-quickstart-multimodule-main-1.0-SNAPSHOT-runner.jar");
+        final Path runnerJar = targetDir.toPath().resolve("quarkus-app").resolve("quarkus-run.jar");
         Assertions.assertTrue(Files.exists(runnerJar), "Runner jar " + runnerJar + " is missing");
         assertZipEntriesCanBeOpenedAndClosed(runnerJar);
     }
