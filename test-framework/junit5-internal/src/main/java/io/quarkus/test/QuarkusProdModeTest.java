@@ -353,10 +353,6 @@ public class QuarkusProdModeTest
             if (applicationVersion != null) {
                 overrideConfigKey("quarkus.application.version", applicationVersion);
             }
-            // TODO fast-jar: QuarkusProdModeTest does not work with fast-jar
-            if (run && !buildNative) {
-                overrideConfigKey("quarkus.package.type", "legacy-jar");
-            }
             if (buildNative) {
                 overrideConfigKey("quarkus.package.type", "native");
             }
