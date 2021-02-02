@@ -1,16 +1,13 @@
 package io.quarkus.maven.it;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -23,7 +20,6 @@ import java.util.zip.ZipInputStream;
 
 import org.apache.maven.shared.invoker.MavenInvocationException;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import io.quarkus.maven.it.verifier.MavenProcessInvocationResult;
@@ -149,9 +145,8 @@ public class PackageIT extends MojoTestBase {
     }
 
     @Test
-    @Disabled("TODO fast-jar: no idea what it's supposed to test?")
     public void testCustomPackaging()
-            throws MavenInvocationException, FileNotFoundException, InterruptedException {
+            throws Exception {
         testDir = getTargetDir("projects/custom-packaging-plugin");
 
         running = new RunningInvoker(testDir, false);
@@ -172,9 +167,10 @@ public class PackageIT extends MojoTestBase {
         for (File f : files) {
             jarNames.add(f.getName());
         }
-        assertEquals(new HashSet<>(Arrays.asList(new String[] { "acme-custom-packaging-app-1.0-SNAPSHOT-runner.jar",
-                "acme-custom-packaging-app-1.0-SNAPSHOT.jar" })),
-                jarNames);
+
+        final Path runnerJar = getTargetDir().toPath().resolve("quarkus-app").resolve("quarkus-run.jar");
+        Assertions.assertTrue(Files.exists(runnerJar), "Runner jar " + runnerJar + " is missing");
+        assertZipEntriesCanBeOpenedAndClosed(runnerJar);
     }
 
     /**
