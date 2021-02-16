@@ -68,7 +68,7 @@ public class SseTestCase {
                 res.complete(collect);
             });
             eventSource.open();
-            Assertions.assertEquals(Arrays.asList("hello", "stef"), res.get(5, TimeUnit.SECONDS));
+            Assertions.assertIterableEquals(Arrays.asList("hello", "stef"), res.get(5, TimeUnit.SECONDS));
         }
     }
 
