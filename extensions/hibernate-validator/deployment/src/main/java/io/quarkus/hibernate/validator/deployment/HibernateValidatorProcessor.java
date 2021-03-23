@@ -206,16 +206,7 @@ class HibernateValidatorProcessor {
         contributeBuiltinConstraints(builtinConstraints, constraints);
 
         // Add the constraint annotations present in the application itself
-        for (AnnotationInstance constraint : indexView.getAnnotations(DotName.createSimple(Constraint.class.getName()))) {
-            constraints.add(constraint.target().asClass().name());
-
-            if (constraint.target().asClass().annotations().containsKey(REPEATABLE)) {
-                for (AnnotationInstance repeatableConstraint : constraint.target().asClass().annotations()
-                        .get(REPEATABLE)) {
-                    constraints.add(repeatableConstraint.value().asClass().name());
-                }
-            }
-        }
+        contributeApplicationConstraints(indexView, constraints);
 
         Set<DotName> allConsideredAnnotations = new HashSet<>();
         allConsideredAnnotations.addAll(constraints);
@@ -235,55 +226,13 @@ class HibernateValidatorProcessor {
         Map<DotName, Set<SimpleMethodSignatureKey>> methodsWithInheritedValidation = new HashMap<>();
         Set<String> detectedBuiltinConstraints = new HashSet<>();
 
-        for (DotName consideredAnnotation : allConsideredAnnotations) {
-            Collection<AnnotationInstance> annotationInstances = indexView.getAnnotations(consideredAnnotation);
-
-            if (annotationInstances.isEmpty()) {
-                continue;
-            }
-
-            // we trim the repeatable container suffix if needed
-            String builtinConstraintCandidate = BUILT_IN_CONSTRAINT_REPEATABLE_CONTAINER_PATTERN
-                    .matcher(consideredAnnotation.toString()).replaceAll("");
-            if (builtinConstraints.contains(builtinConstraintCandidate)) {
-                detectedBuiltinConstraints.add(builtinConstraintCandidate);
-            }
-
-            for (AnnotationInstance annotation : annotationInstances) {
-                if (annotation.target().kind() == AnnotationTarget.Kind.FIELD) {
-                    contributeClass(classNamesToBeValidated, indexView, annotation.target().asField().declaringClass().name());
-                    reflectiveFields.produce(new ReflectiveFieldBuildItem(annotation.target().asField()));
-                    contributeClassMarkedForCascadingValidation(classNamesToBeValidated, indexView, consideredAnnotation,
-                            annotation.target().asField().type());
-                } else if (annotation.target().kind() == AnnotationTarget.Kind.METHOD) {
-                    contributeClass(classNamesToBeValidated, indexView, annotation.target().asMethod().declaringClass().name());
-                    // we need to register the method for reflection as it could be a getter
-                    reflectiveMethods.produce(new ReflectiveMethodBuildItem(annotation.target().asMethod()));
-                    contributeClassMarkedForCascadingValidation(classNamesToBeValidated, indexView, consideredAnnotation,
-                            annotation.target().asMethod().returnType());
-                    contributeMethodsWithInheritedValidation(methodsWithInheritedValidation, indexView,
-                            annotation.target().asMethod());
-                } else if (annotation.target().kind() == AnnotationTarget.Kind.METHOD_PARAMETER) {
-                    contributeClass(classNamesToBeValidated, indexView,
-                            annotation.target().asMethodParameter().method().declaringClass().name());
-                    // a getter does not have parameters so it's a pure method: no need for reflection in this case
-                    contributeClassMarkedForCascadingValidation(classNamesToBeValidated, indexView, consideredAnnotation,
-                            // FIXME this won't work in the case of synthetic parameters
-                            annotation.target().asMethodParameter().method().parameters()
-                                    .get(annotation.target().asMethodParameter().position()));
-                    contributeMethodsWithInheritedValidation(methodsWithInheritedValidation, indexView,
-                            annotation.target().asMethodParameter().method());
-                } else if (annotation.target().kind() == AnnotationTarget.Kind.CLASS) {
-                    contributeClass(classNamesToBeValidated, indexView, annotation.target().asClass().name());
-                    // no need for reflection in the case of a class level constraint
-                }
-            }
-        }
+        collectConstrainedElements(indexView, reflectiveFields, reflectiveMethods, builtinConstraints, allConsideredAnnotations,
+                classNamesToBeValidated, methodsWithInheritedValidation, detectedBuiltinConstraints);
 
         // JAX-RS methods are handled differently by the transformer so those need to be gathered here.
         // Note: The focus only on methods is basically an incomplete solution, since there could also be
         // class-level JAX-RS annotations but currently the transformer only looks at methods.
-        Map<DotName, Set<SimpleMethodSignatureKey>> jaxRsMethods = gatherJaxRsMethods(additionalJaxRsResourceMethodAnnotations,
+        Map<DotName, Set<SimpleMethodSignatureKey>> jaxRsMethods = collectJaxRsMethods(additionalJaxRsResourceMethodAnnotations,
                 indexView);
 
         // Add the annotations transformer to add @MethodValidated annotations on the methods requiring validation
@@ -333,6 +282,71 @@ class HibernateValidatorProcessor {
             // they are all inner classes called List
             // while not all our built-in constraints are repeatable, let's avoid loading the class to check
             consideredAnnotationsCollector.add(DotName.createSimple(builtinConstraint + "$List"));
+        }
+    }
+
+    private static void contributeApplicationConstraints(IndexView indexView, Set<DotName> constraints) {
+        for (AnnotationInstance constraint : indexView.getAnnotations(DotName.createSimple(Constraint.class.getName()))) {
+            constraints.add(constraint.target().asClass().name());
+
+            if (constraint.target().asClass().annotations().containsKey(REPEATABLE)) {
+                for (AnnotationInstance repeatableConstraint : constraint.target().asClass().annotations()
+                        .get(REPEATABLE)) {
+                    constraints.add(repeatableConstraint.value().asClass().name());
+                }
+            }
+        }
+    }
+
+    private static void collectConstrainedElements(IndexView indexView,
+            BuildProducer<ReflectiveFieldBuildItem> reflectiveFields,
+            BuildProducer<ReflectiveMethodBuildItem> reflectiveMethods, Set<String> builtinConstraints,
+            Set<DotName> allConsideredAnnotations, Set<DotName> classNamesToBeValidated,
+            Map<DotName, Set<SimpleMethodSignatureKey>> methodsWithInheritedValidation,
+            Set<String> detectedBuiltinConstraints) {
+        for (DotName consideredAnnotation : allConsideredAnnotations) {
+            Collection<AnnotationInstance> annotationInstances = indexView.getAnnotations(consideredAnnotation);
+
+            if (annotationInstances.isEmpty()) {
+                continue;
+            }
+
+            // we trim the repeatable container suffix if needed
+            String builtinConstraintCandidate = BUILT_IN_CONSTRAINT_REPEATABLE_CONTAINER_PATTERN
+                    .matcher(consideredAnnotation.toString()).replaceAll("");
+            if (builtinConstraints.contains(builtinConstraintCandidate)) {
+                detectedBuiltinConstraints.add(builtinConstraintCandidate);
+            }
+
+            for (AnnotationInstance annotation : annotationInstances) {
+                if (annotation.target().kind() == AnnotationTarget.Kind.FIELD) {
+                    contributeClass(classNamesToBeValidated, indexView, annotation.target().asField().declaringClass().name());
+                    reflectiveFields.produce(new ReflectiveFieldBuildItem(annotation.target().asField()));
+                    contributeClassMarkedForCascadingValidation(classNamesToBeValidated, indexView, consideredAnnotation,
+                            annotation.target().asField().type());
+                } else if (annotation.target().kind() == AnnotationTarget.Kind.METHOD) {
+                    contributeClass(classNamesToBeValidated, indexView, annotation.target().asMethod().declaringClass().name());
+                    // we need to register the method for reflection as it could be a getter
+                    reflectiveMethods.produce(new ReflectiveMethodBuildItem(annotation.target().asMethod()));
+                    contributeClassMarkedForCascadingValidation(classNamesToBeValidated, indexView, consideredAnnotation,
+                            annotation.target().asMethod().returnType());
+                    contributeMethodsWithInheritedValidation(methodsWithInheritedValidation, indexView,
+                            annotation.target().asMethod());
+                } else if (annotation.target().kind() == AnnotationTarget.Kind.METHOD_PARAMETER) {
+                    contributeClass(classNamesToBeValidated, indexView,
+                            annotation.target().asMethodParameter().method().declaringClass().name());
+                    // a getter does not have parameters so it's a pure method: no need for reflection in this case
+                    contributeClassMarkedForCascadingValidation(classNamesToBeValidated, indexView, consideredAnnotation,
+                            // FIXME this won't work in the case of synthetic parameters
+                            annotation.target().asMethodParameter().method().parameters()
+                                    .get(annotation.target().asMethodParameter().position()));
+                    contributeMethodsWithInheritedValidation(methodsWithInheritedValidation, indexView,
+                            annotation.target().asMethodParameter().method());
+                } else if (annotation.target().kind() == AnnotationTarget.Kind.CLASS) {
+                    contributeClass(classNamesToBeValidated, indexView, annotation.target().asClass().name());
+                    // no need for reflection in the case of a class level constraint
+                }
+            }
         }
     }
 
@@ -396,7 +410,7 @@ class HibernateValidatorProcessor {
         }
     }
 
-    private static Map<DotName, Set<SimpleMethodSignatureKey>> gatherJaxRsMethods(
+    private static Map<DotName, Set<SimpleMethodSignatureKey>> collectJaxRsMethods(
             List<AdditionalJaxRsResourceMethodAnnotationsBuildItem> additionalJaxRsResourceMethodAnnotations,
             IndexView indexView) {
         Map<DotName, Set<SimpleMethodSignatureKey>> jaxRsMethods = new HashMap<>();
