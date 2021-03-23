@@ -179,19 +179,19 @@ class HibernateValidatorProcessor {
     @BuildStep
     @Record(STATIC_INIT)
     public void build(HibernateValidatorRecorder recorder, RecorderContext recorderContext,
-            BuildProducer<ReflectiveFieldBuildItem> reflectiveFields,
-            BuildProducer<ReflectiveMethodBuildItem> reflectiveMethods,
-            BuildProducer<AnnotationsTransformerBuildItem> annotationsTransformers,
             BeanArchiveIndexBuildItem beanArchiveIndexBuildItem,
             CombinedIndexBuildItem combinedIndexBuildItem,
-            BuildProducer<FeatureBuildItem> feature,
-            BuildProducer<BeanContainerListenerBuildItem> beanContainerListener,
-            BuildProducer<BeanValidationAnnotationsBuildItem> beanValidationAnnotations,
-            ShutdownContextBuildItem shutdownContext,
             List<AdditionalJaxRsResourceMethodAnnotationsBuildItem> additionalJaxRsResourceMethodAnnotations,
             Capabilities capabilities,
             LocalesBuildTimeConfig localesBuildTimeConfig,
-            HibernateValidatorBuildTimeConfig hibernateValidatorBuildTimeConfig) throws Exception {
+            HibernateValidatorBuildTimeConfig hibernateValidatorBuildTimeConfig,
+            ShutdownContextBuildItem shutdownContext,
+            BuildProducer<ReflectiveFieldBuildItem> reflectiveFields,
+            BuildProducer<ReflectiveMethodBuildItem> reflectiveMethods,
+            BuildProducer<AnnotationsTransformerBuildItem> annotationsTransformers,
+            BuildProducer<FeatureBuildItem> feature,
+            BuildProducer<BeanContainerListenerBuildItem> beanContainerListener,
+            BuildProducer<BeanValidationAnnotationsBuildItem> beanValidationAnnotations) throws Exception {
 
         feature.produce(new FeatureBuildItem(Feature.HIBERNATE_VALIDATOR));
 
