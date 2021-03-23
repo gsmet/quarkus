@@ -25,10 +25,12 @@ import javax.validation.ParameterNameProvider;
 import javax.validation.TraversableResolver;
 import javax.validation.Valid;
 import javax.validation.ValidationException;
+import javax.validation.ValidatorFactory;
 import javax.validation.executable.ValidateOnExecution;
 import javax.validation.valueextraction.ValueExtractor;
 import javax.ws.rs.Priorities;
 
+import org.hibernate.validator.HibernateValidatorFactory;
 import org.hibernate.validator.internal.metadata.core.ConstraintHelper;
 import org.hibernate.validator.messageinterpolation.AbstractMessageInterpolator;
 import org.hibernate.validator.spi.messageinterpolation.LocaleResolver;
@@ -47,7 +49,6 @@ import io.quarkus.arc.deployment.AdditionalBeanBuildItem;
 import io.quarkus.arc.deployment.AnnotationsTransformerBuildItem;
 import io.quarkus.arc.deployment.AutoAddScopeBuildItem;
 import io.quarkus.arc.deployment.BeanArchiveIndexBuildItem;
-import io.quarkus.arc.deployment.BeanContainerListenerBuildItem;
 import io.quarkus.arc.deployment.SyntheticBeanBuildItem;
 import io.quarkus.arc.deployment.UnremovableBeanBuildItem;
 import io.quarkus.arc.processor.BeanInfo;
@@ -72,7 +73,8 @@ import io.quarkus.deployment.logging.LogCleanupFilterBuildItem;
 import io.quarkus.deployment.recording.RecorderContext;
 import io.quarkus.hibernate.validator.runtime.HibernateValidatorBuildTimeConfig;
 import io.quarkus.hibernate.validator.runtime.HibernateValidatorRecorder;
-import io.quarkus.hibernate.validator.runtime.ValidatorProvider;
+import io.quarkus.hibernate.validator.runtime.HibernateValidatorRecorder.ValidatorFactoryDestroyer;
+import io.quarkus.hibernate.validator.runtime.ValidatorProducer;
 import io.quarkus.hibernate.validator.runtime.interceptor.MethodValidationInterceptor;
 import io.quarkus.hibernate.validator.runtime.jaxrs.QuarkusRestViolationExceptionMapper;
 import io.quarkus.hibernate.validator.runtime.jaxrs.ResteasyConfigSupport;
@@ -82,6 +84,7 @@ import io.quarkus.resteasy.common.spi.ResteasyDotNames;
 import io.quarkus.resteasy.reactive.spi.ExceptionMapperBuildItem;
 import io.quarkus.resteasy.server.common.spi.AdditionalJaxRsResourceMethodAnnotationsBuildItem;
 import io.quarkus.runtime.LocalesBuildTimeConfig;
+import io.quarkus.runtime.RuntimeValue;
 
 class HibernateValidatorProcessor {
 
@@ -135,7 +138,7 @@ class HibernateValidatorProcessor {
             BuildProducer<SyntheticBeanBuildItem> syntheticBeanBuildItems,
             Capabilities capabilities) {
         // The bean encapsulating the Validator and ValidatorFactory
-        additionalBeans.produce(new AdditionalBeanBuildItem(ValidatorProvider.class));
+        additionalBeans.produce(new AdditionalBeanBuildItem(ValidatorProducer.class));
 
         // The CDI interceptor which will validate the methods annotated with @MethodValidated
         additionalBeans.produce(new AdditionalBeanBuildItem(MethodValidationInterceptor.class));
@@ -190,8 +193,8 @@ class HibernateValidatorProcessor {
             BuildProducer<ReflectiveMethodBuildItem> reflectiveMethods,
             BuildProducer<AnnotationsTransformerBuildItem> annotationsTransformers,
             BuildProducer<FeatureBuildItem> feature,
-            BuildProducer<BeanContainerListenerBuildItem> beanContainerListener,
-            BuildProducer<BeanValidationAnnotationsBuildItem> beanValidationAnnotations) throws Exception {
+            BuildProducer<BeanValidationAnnotationsBuildItem> beanValidationAnnotations,
+            BuildProducer<SyntheticBeanBuildItem> syntheticBeans) throws Exception {
 
         feature.produce(new FeatureBuildItem(Feature.HIBERNATE_VALIDATOR));
 
@@ -248,14 +251,22 @@ class HibernateValidatorProcessor {
             classesToBeValidated.add(recorderContext.classProxy(className.toString()));
         }
 
-        beanContainerListener
-                .produce(new BeanContainerListenerBuildItem(
-                        recorder.initializeValidatorFactory(classesToBeValidated, detectedBuiltinConstraints,
-                                hasXmlConfiguration(),
-                                capabilities.isPresent(Capability.HIBERNATE_ORM),
-                                shutdownContext,
-                                localesBuildTimeConfig,
-                                hibernateValidatorBuildTimeConfig)));
+        RuntimeValue<ValidatorFactory> validatorFactory = recorder.initializeValidatorFactory(classesToBeValidated,
+                detectedBuiltinConstraints,
+                hasXmlConfiguration(),
+                capabilities.isPresent(Capability.HIBERNATE_ORM),
+                localesBuildTimeConfig,
+                hibernateValidatorBuildTimeConfig);
+
+        // the idea was then to push this RuntimeValue<ValidatorFactory> to a build item that could be consumed.
+
+        syntheticBeans.produce(SyntheticBeanBuildItem.configure(ValidatorFactory.class)
+                .named("quarkus-hibernate-validator-factory")
+                .types(HibernateValidatorFactory.class)
+                .defaultBean()
+                .runtimeValue(validatorFactory)
+                .destroyer(ValidatorFactoryDestroyer.class)
+                .done());
     }
 
     @BuildStep

@@ -2,21 +2,23 @@ package io.quarkus.hibernate.validator.runtime;
 
 import javax.enterprise.context.ApplicationScoped;
 import javax.enterprise.inject.Produces;
-import javax.inject.Named;
+import javax.inject.Inject;
+import javax.inject.Singleton;
 import javax.validation.Validator;
 import javax.validation.ValidatorFactory;
 
+import io.quarkus.arc.DefaultBean;
+
 @ApplicationScoped
-public class ValidatorProvider {
+public class ValidatorProducer {
+
+    @Inject
+    ValidatorFactory validatorFactory;
 
     @Produces
-    @Named("quarkus-hibernate-validator-factory")
-    public ValidatorFactory factory() {
-        return ValidatorHolder.getValidatorFactory();
-    }
-
-    @Produces
+    @Singleton
+    @DefaultBean
     public Validator validator() {
-        return ValidatorHolder.getValidator();
+        return validatorFactory.getValidator();
     }
 }
