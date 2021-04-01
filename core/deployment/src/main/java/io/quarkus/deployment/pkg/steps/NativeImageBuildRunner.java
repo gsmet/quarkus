@@ -46,8 +46,8 @@ public abstract class NativeImageBuildRunner {
     public void cleanupServer(File outputDir) throws InterruptedException, IOException {
     }
 
-    public int build(List<String> args, String nativeImageName, Path outputDir, boolean debugEnabled,
-            boolean processInheritIODisabled)
+    public int build(List<String> args, String nativeImageName, String resultingExecutableName, Path outputDir,
+            boolean debugEnabled, boolean processInheritIODisabled)
             throws InterruptedException, IOException {
         preBuild(args);
         try {
@@ -69,10 +69,10 @@ public abstract class NativeImageBuildRunner {
 
             if (objcopyExists()) {
                 if (debugEnabled) {
-                    splitDebugSymbols(nativeImageName);
+                    splitDebugSymbols(nativeImageName, resultingExecutableName);
                 } else {
                     // Strip debug symbols regardless, because the underlying JDK might contain them
-                    objcopy("--strip-debug", nativeImageName);
+                    objcopy("--strip-debug", resultingExecutableName);
                 }
             } else {
                 log.warn("objcopy executable not found in PATH. Debug symbols will not be separated from executable.");
@@ -84,10 +84,10 @@ public abstract class NativeImageBuildRunner {
         }
     }
 
-    private void splitDebugSymbols(String executable) {
-        String symbols = String.format("%s.debug", executable);
-        objcopy("--only-keep-debug", executable, symbols);
-        objcopy(String.format("--add-gnu-debuglink=%s", symbols), executable);
+    private void splitDebugSymbols(String nativeImageName, String resultingExecutableName) {
+        String symbols = String.format("%s.debug", nativeImageName);
+        objcopy("--only-keep-debug", resultingExecutableName, symbols);
+        objcopy(String.format("--add-gnu-debuglink=%s", symbols), resultingExecutableName);
     }
 
     protected abstract String[] getGraalVMVersionCommand(List<String> args);
