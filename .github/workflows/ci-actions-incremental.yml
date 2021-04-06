@@ -303,6 +303,8 @@ jobs:
   linux-jvm-maven-tests:
     name: Maven Tests - JDK ${{matrix.java.name}}
     runs-on: ubuntu-latest
+    env:
+      MAVEN_OPTS: -Xmx2048m -XX:MaxMetaspaceSize=1000m
     # Skip main in forks
     if: "github.repository == 'quarkusio/quarkus' || !endsWith(github.ref, '/main')"
     needs: build-jdk11
@@ -358,6 +360,8 @@ jobs:
   windows-jdk11-jvm-maven-tests:
     name: Maven Tests - JDK 11 Windows
     runs-on: windows-latest
+    env:
+      MAVEN_OPTS: -Xmx2048m -XX:MaxMetaspaceSize=1000m
     # Skip main in forks
     if: "github.repository == 'quarkusio/quarkus' || !endsWith(github.ref, '/main')"
     needs: build-jdk11
