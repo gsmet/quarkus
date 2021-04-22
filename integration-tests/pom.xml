@@ -171,6 +171,9 @@
         <module>native-config-profile</module>
         <module>logging-min-level-unset</module>
         <module>logging-min-level-set</module>
+        <module>google-cloud-functions-http</module>
+        <module>google-cloud-functions</module>
+        <module>rocksdb</module>
 
         <!-- gRPC tests -->
         <module>grpc-tls</module>
@@ -181,8 +184,6 @@
         <module>grpc-interceptors</module>
         <module>grpc-proto-v2</module>
         <module>grpc-health</module>
-        <module>google-cloud-functions-http</module>
-        <module>google-cloud-functions</module>
     </modules>
 
     <build>
