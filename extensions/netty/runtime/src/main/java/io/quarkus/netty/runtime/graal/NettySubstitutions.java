@@ -98,6 +98,7 @@ final class Target_io_netty_handler_ssl_JdkAlpnApplicationProtocolNegotiator {
 /**
  * Hardcode io.netty.handler.ssl.OpenSsl as non-available
  */
+@Substitute
 @TargetClass(className = "io.netty.handler.ssl.OpenSsl")
 final class Target_io_netty_handler_ssl_OpenSsl {
 
@@ -139,6 +140,16 @@ final class Target_io_netty_handler_ssl_OpenSsl {
     }
 
     @Substitute
+    public static boolean isAlpnSupported() {
+        return false;
+    }
+
+    @Substitute
+    public static boolean isOcspSupported() {
+        return false;
+    }
+
+    @Substitute
     public static int version() {
         return -1;
     }
@@ -149,7 +160,41 @@ final class Target_io_netty_handler_ssl_OpenSsl {
     }
 
     @Substitute
+    public static void ensureAvailability() {
+    }
+
+    @Substitute
+    public static Throwable unavailabilityCause() {
+        return UNAVAILABILITY_CAUSE;
+    }
+
+    @Substitute
+    public static Set<String> availableCipherSuites() {
+        return Collections.emptySet();
+    }
+
+    @Substitute
+    public static Set<String> availableOpenSslCipherSuites() {
+        return Collections.emptySet();
+    }
+
+    @Substitute
+    public static Set<String> availableJavaCipherSuites() {
+        return Collections.emptySet();
+    }
+
+    @Substitute
     public static boolean isCipherSuiteAvailable(String cipherSuite) {
+        return false;
+    }
+
+    @Substitute
+    public static boolean supportsKeyManagerFactory() {
+        return false;
+    }
+
+    @Substitute
+    public static boolean supportsHostnameValidation() {
         return false;
     }
 }
@@ -599,6 +644,23 @@ final class Target_io_netty_handler_codec_http2_DelegatingDecompressorFrameListe
         }
     }
 }
+
+//@TargetClass(className = "io.netty.handler.ssl.ReferenceCountedOpenSslEngine")
+//@Delete
+//final class Target_io_netty_handler_ssl_ReferenceCountedOpenSslEngine {
+//    //
+//    //    @Delete
+//    //    private static int[] OPENSSL_OP_NO_PROTOCOLS;
+//    //
+//    //    // These two constants are only used when tcnative is enabled.
+//    //
+//    //    @Delete
+//    //    static int MAX_PLAINTEXT_LENGTH;
+//    //
+//    //    @Delete
+//    //    static int MAX_RECORD_SIZE;
+//
+//}
 
 class NettySubstitutions {
 

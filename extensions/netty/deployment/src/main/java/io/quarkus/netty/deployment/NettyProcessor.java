@@ -107,12 +107,56 @@ class NettyProcessor {
                 .addRuntimeInitializedClass("io.netty.buffer.ByteBufUtil")
                 .addNativeImageSystemProperty("io.netty.leakDetection.level", "DISABLED");
 
+        // Related to io.netty.util.internal.PlatformDependent
+        // This particular class is made *Re*initialized because of the PlatformDependent usage
+        // in io.netty.handler.ssl.OpenSsl <clinit>.
+        // Making io.netty.handler.ssl.OpenSsl initialized at runtime triggers all sorts of problems.
+        // One option could be to
+        builder.addRuntimeReinitializedClass("io.netty.util.internal.PlatformDependent");
+        builder
+                .addRuntimeInitializedClass("io.netty.util.NetUtil")
+                .addRuntimeInitializedClass("io.netty.util.AsciiString")
+                .addRuntimeInitializedClass("io.netty.util.AttributeKey")
+                .addRuntimeInitializedClass("io.netty.util.Signal")
+                .addRuntimeInitializedClass("io.netty.util.internal.CleanerJava6")
+                .addRuntimeInitializedClass("io.netty.channel.ChannelOption")
+                .addRuntimeInitializedClass("io.netty.channel.socket.nio.NioDatagramChannelConfig")
+                .addRuntimeInitializedClass("io.netty.channel.DefaultChannelId")
+                .addRuntimeInitializedClass("io.netty.buffer.UnsafeByteBufUtil")
+                .addRuntimeInitializedClass("io.netty.buffer.EmptyByteBuf")
+                .addRuntimeInitializedClass("io.netty.buffer.PoolArena")
+                .addRuntimeInitializedClass("io.netty.buffer.UnpooledByteBufAllocator")
+                .addRuntimeInitializedClass("io.netty.buffer.Unpooled")
+                .addRuntimeInitializedClass("io.netty.handler.codec.compression.ZlibCodecFactory")
+                .addRuntimeInitializedClass("io.netty.handler.codec.ReplayingDecoder")
+                .addRuntimeInitializedClass("io.netty.handler.codec.ReplayingDecoderByteBuf")
+                .addRuntimeInitializedClass("io.netty.handler.codec.CharSequenceValueConverter")
+                .addRuntimeInitializedClass("io.netty.handler.codec.compression.ByteBufChecksum")
+                .addRuntimeInitializedClass("io.netty.handler.codec.DecoderResult")
+                .addRuntimeInitializedClass("io.netty.handler.ssl.JdkAlpnApplicationProtocolNegotiator")
+                .addRuntimeInitializedClass("io.netty.handler.ssl.Conscrypt")
+                .addRuntimeInitializedClass("io.netty.handler.ssl.JettyAlpnSslEngine");
+
         try {
             Class.forName("io.netty.handler.codec.http.HttpObjectEncoder");
             builder
                     .addRuntimeInitializedClass("io.netty.handler.codec.http.HttpObjectEncoder")
                     .addRuntimeInitializedClass("io.netty.handler.codec.http.websocketx.extensions.compression.DeflateDecoder")
                     .addRuntimeInitializedClass("io.netty.handler.codec.http.websocketx.WebSocket00FrameEncoder");
+
+            // Related to io.netty.util.internal.PlatformDependent
+            builder
+                    .addRuntimeInitializedClass("io.netty.handler.codec.http.HttpHeaderValues")
+                    .addRuntimeInitializedClass("io.netty.handler.codec.http.HttpStatusClass")
+                    .addRuntimeInitializedClass("io.netty.handler.codec.http.HttpUtil")
+                    .addRuntimeInitializedClass("io.netty.handler.codec.http.HttpResponseStatus")
+                    .addRuntimeInitializedClass("io.netty.handler.codec.http.HttpMethod")
+                    .addRuntimeInitializedClass("io.netty.handler.codec.http.HttpContentDecoder")
+                    .addRuntimeInitializedClass("io.netty.handler.codec.http.HttpContentEncoder")
+                    .addRuntimeInitializedClass("io.netty.handler.codec.http.HttpHeaderNames")
+                    .addRuntimeInitializedClass("io.netty.handler.codec.http.HttpObjectAggregator")
+                    .addRuntimeInitializedClass("io.netty.handler.codec.http.multipart.HttpPostMultipartRequestDecoder")
+                    .addRuntimeInitializedClass("io.netty.handler.codec.http.websocketx.WebSocketVersion");
         } catch (ClassNotFoundException e) {
             //ignore
             log.debug("Not registering Netty HTTP classes as they were not found");
@@ -125,6 +169,13 @@ class NettyProcessor {
                     .addRuntimeInitializedClass("io.netty.handler.codec.http2.Http2ClientUpgradeCodec")
                     .addRuntimeInitializedClass("io.netty.handler.codec.http2.DefaultHttp2FrameWriter")
                     .addRuntimeInitializedClass("io.netty.handler.codec.http2.Http2ConnectionHandler");
+
+            // Related to io.netty.util.internal.PlatformDependent
+            builder
+                    .addRuntimeInitializedClass("io.netty.handler.codec.http2.HpackDecoder")
+                    .addRuntimeInitializedClass("io.netty.handler.codec.http2.HpackHuffmanDecoder")
+                    .addRuntimeInitializedClass("io.netty.handler.codec.http2.HpackStaticTable")
+                    .addRuntimeInitializedClass("io.netty.handler.codec.http2.Http2Headers$PseudoHeaderName");
         } catch (ClassNotFoundException e) {
             //ignore
             log.debug("Not registering Netty HTTP2 classes as they were not found");
@@ -193,9 +244,9 @@ class NettyProcessor {
         }
 
         // IMPLEMENTATION NOTE:
-        // We use Singleton scope for both beans. ApplicationScoped causes problems with EventLoopGroup.next() 
-        // which overrides the EventExecutorGroup.next() method but since Netty 4 is compiled with JDK6 the corresponding bridge method 
-        // is not generated and the invocation upon the client proxy results in an AbstractMethodError 
+        // We use Singleton scope for both beans. ApplicationScoped causes problems with EventLoopGroup.next()
+        // which overrides the EventExecutorGroup.next() method but since Netty 4 is compiled with JDK6 the corresponding bridge method
+        // is not generated and the invocation upon the client proxy results in an AbstractMethodError
         syntheticBeans.produce(SyntheticBeanBuildItem.configure(EventLoopGroup.class)
                 .supplier(boss)
                 .scope(Singleton.class)

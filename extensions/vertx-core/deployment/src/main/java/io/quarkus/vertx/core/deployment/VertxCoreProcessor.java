@@ -42,15 +42,29 @@ class VertxCoreProcessor {
     @BuildStep
     NativeImageConfigBuildItem build(BuildProducer<ReflectiveClassBuildItem> reflectiveClass) {
         reflectiveClass.produce(new ReflectiveClassBuildItem(true, false, VertxLogDelegateFactory.class.getName()));
-        return NativeImageConfigBuildItem.builder()
+        NativeImageConfigBuildItem.Builder builder = NativeImageConfigBuildItem.builder()
                 .addRuntimeInitializedClass("io.vertx.core.net.impl.PartialPooledByteBufAllocator")
                 .addRuntimeInitializedClass("io.vertx.core.http.impl.VertxHttp2ClientUpgradeCodec")
                 .addRuntimeInitializedClass("io.vertx.core.eventbus.impl.clustered.ClusteredEventBus")
 
                 .addNativeImageSystemProperty(ResolverProvider.DISABLE_DNS_RESOLVER_PROP_NAME, "true")
                 .addNativeImageSystemProperty("vertx.logger-delegate-factory-class-name",
-                        VertxLogDelegateFactory.class.getName())
-                .build();
+                        VertxLogDelegateFactory.class.getName());
+
+        // Related to io.netty.util.internal.PlatformDependent
+        builder
+                .addRuntimeInitializedClass("io.vertx.core.buffer.impl.VertxByteBufAllocator")
+                .addRuntimeInitializedClass("io.vertx.core.impl.Utils")
+                .addRuntimeInitializedClass("io.vertx.core.net.impl.ConnectionBase")
+                .addRuntimeInitializedClass("io.vertx.core.net.impl.SslHandshakeCompletionHandler")
+                .addRuntimeInitializedClass("io.vertx.core.http.impl.HttpUtils")
+                .addRuntimeInitializedClass("io.vertx.core.http.HttpHeaders")
+                .addRuntimeInitializedClass("io.vertx.core.http.HttpMethod")
+                .addRuntimeInitializedClass("io.vertx.core.http.impl.VertxHttp2Stream")
+                .addRuntimeInitializedClass("io.vertx.core.http.impl.Http1xServerResponse")
+                .addRuntimeInitializedClass("io.vertx.core.http.impl.headers.HeadersMultiMap");
+
+        return builder.build();
     }
 
     @BuildStep

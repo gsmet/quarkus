@@ -303,6 +303,13 @@ class VertxHttpProcessor {
         runtimeInitializedClasses
                 .produce(new RuntimeInitializedClassBuildItem("io.vertx.ext.web.handler.sockjs.impl.XhrTransport"));
         runtimeInitializedClasses.produce(new RuntimeInitializedClassBuildItem("io.vertx.ext.auth.impl.jose.JWT"));
+
+        // Related to io.netty.util.internal.PlatformDependent
+        runtimeInitializedClasses
+                .produce(new RuntimeInitializedClassBuildItem("io.quarkus.vertx.http.runtime.VertxHttpRecorder"));
+        runtimeInitializedClasses
+                .produce(new RuntimeInitializedClassBuildItem("io.quarkus.vertx.http.runtime.ForwardedParser"));
+        runtimeInitializedClasses.produce(new RuntimeInitializedClassBuildItem("io.vertx.ext.web.impl.ForwardedParser"));
     }
 
     /**
