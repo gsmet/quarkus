@@ -5,6 +5,7 @@ import static io.netty.handler.codec.http.HttpHeaderValues.GZIP;
 import static io.netty.handler.codec.http.HttpHeaderValues.X_DEFLATE;
 import static io.netty.handler.codec.http.HttpHeaderValues.X_GZIP;
 
+import java.io.File;
 import java.nio.ByteBuffer;
 import java.security.PrivateKey;
 import java.security.Provider;
@@ -15,6 +16,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.atomic.AtomicLong;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLEngine;
@@ -52,6 +54,7 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextOption;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.util.concurrent.GlobalEventExecutor;
+import io.netty.util.internal.SystemPropertyUtil;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 import io.netty.util.internal.logging.JdkLoggerFactory;
 import io.quarkus.netty.runtime.EmptyByteBufStub;
@@ -661,6 +664,91 @@ final class Target_io_netty_handler_codec_http2_DelegatingDecompressorFrameListe
 //    //    static int MAX_RECORD_SIZE;
 //
 //}
+
+@TargetClass(className = "io.netty.util.internal.PlatformDependent")
+final class Target_io_netty_util_internal_PlatformDependent {
+
+    @Alias
+    private static long MAX_DIRECT_MEMORY;
+
+    @Alias
+    @RecomputeFieldValue(kind = Kind.FromAlias)
+    private static File TMPDIR = tmpdir0();
+
+    @Alias
+    @RecomputeFieldValue(kind = Kind.FromAlias)
+    private static boolean USE_DIRECT_BUFFER_NO_CLEANER = useDirectBufferNoCleaner();
+
+    @Alias
+    @RecomputeFieldValue(kind = Kind.FromAlias)
+    private static AtomicLong DIRECT_MEMORY_COUNTER = directMemoryCounter();
+
+    @Alias
+    @RecomputeFieldValue(kind = Kind.FromAlias)
+    private static long DIRECT_MEMORY_LIMIT = directMemoryLimit();
+
+    private static long directMemoryLimit() {
+        long maxDirectMemory = SystemPropertyUtil.getLong("io.netty.maxDirectMemory", -1);
+
+        if (maxDirectMemory == 0 || !hasUnsafe() || !Target_io_netty_util_internal_PlatformDependent0.hasDirectBufferNoCleanerConstructor()) {
+            // let's keep the original logic
+        } else {
+            if (maxDirectMemory < 0) {
+                maxDirectMemory = MAX_DIRECT_MEMORY;
+            }
+        }
+
+        return maxDirectMemory >= 1 ? maxDirectMemory : MAX_DIRECT_MEMORY;
+    }
+
+    private static AtomicLong directMemoryCounter() {
+        long maxDirectMemory = SystemPropertyUtil.getLong("io.netty.maxDirectMemory", -1);
+
+        if (maxDirectMemory == 0 || !hasUnsafe() || !Target_io_netty_util_internal_PlatformDependent0.hasDirectBufferNoCleanerConstructor()) {
+            return null;
+        } else {
+            if (maxDirectMemory < 0) {
+                maxDirectMemory = MAX_DIRECT_MEMORY;
+                if (maxDirectMemory <= 0) {
+                    return null;
+                } else {
+                    return new AtomicLong();
+                }
+            } else {
+                return new AtomicLong();
+            }
+        }
+    }
+
+    private static boolean useDirectBufferNoCleaner() {
+        long maxDirectMemory = SystemPropertyUtil.getLong("io.netty.maxDirectMemory", -1);
+
+        if (maxDirectMemory == 0 || !hasUnsafe() || !Target_io_netty_util_internal_PlatformDependent0.hasDirectBufferNoCleanerConstructor()) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    @Alias
+    private static File tmpdir0() {
+        return null;
+    }
+
+    @Alias
+    public static boolean hasUnsafe() {
+        return true;
+    }
+}
+
+@TargetClass(className = "io.netty.util.internal.PlatformDependent0")
+final class Target_io_netty_util_internal_PlatformDependent0 {
+
+    @Alias
+    static boolean hasDirectBufferNoCleanerConstructor() {
+        return true;
+    }
+}
 
 class NettySubstitutions {
 
