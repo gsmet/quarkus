@@ -99,7 +99,6 @@ updates:
       - dependency-name: com.fasterxml.jackson:jackson-bom
       - dependency-name: com.fasterxml:classmate
       # AWS
-      - dependency-name: software.amazon.awssdk:*
       - dependency-name: com.amazonaws:*
       - dependency-name: com.amazonaws.serverless:*
       # Azure
