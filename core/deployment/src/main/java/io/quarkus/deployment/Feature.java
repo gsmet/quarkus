@@ -53,7 +53,6 @@ public enum Feature {
     JDBC_MSSQL,
     JDBC_MYSQL,
     JDBC_ORACLE,
-    JSCH,
     KAFKA_CLIENT,
     KAFKA_STREAMS,
     KEYCLOAK_AUTHORIZATION,
