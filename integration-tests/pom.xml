@@ -225,7 +225,6 @@
                 <module>mongodb-panache</module>
                 <module>mongodb-panache-kotlin</module>
                 <module>mongodb-rest-data-panache</module>
-                <module>narayana-stm</module>
                 <module>narayana-jta</module>
                 <module>elytron-security-jdbc</module>
                 <module>elytron-security-ldap</module>
