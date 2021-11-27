@@ -178,7 +178,6 @@
         <module>smallrye-graphql-client</module>
 
         <!-- Logging -->
-        <module>logging-json</module>
         <module>logging-sentry</module>
 
         <!-- Templating -->
