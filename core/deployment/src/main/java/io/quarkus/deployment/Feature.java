@@ -58,7 +58,6 @@ public enum Feature {
     MONGODB_REST_DATA_PANACHE,
     MUTINY,
     NARAYANA_JTA,
-    NARAYANA_LRA,
     NARAYANA_STM,
     NEO4J,
     OIDC,
