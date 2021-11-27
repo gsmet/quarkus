@@ -100,7 +100,6 @@ updates:
       - dependency-name: com.fasterxml:classmate
       # AWS
       - dependency-name: software.amazon.awssdk:*
-      - dependency-name: com.amazon.alexa:*
       - dependency-name: com.amazonaws:*
       - dependency-name: com.amazonaws.serverless:*
       # Azure

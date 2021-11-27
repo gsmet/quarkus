@@ -143,7 +143,6 @@
         <aws-lambda-serverless-java-container.version>1.6</aws-lambda-serverless-java-container.version>
         <aws-xray.version>2.10.0</aws-xray.version>
         <awssdk.version>2.17.90</awssdk.version>
-        <aws-alexa-sdk.version>2.42.0</aws-alexa-sdk.version>
         <azure-functions-java-library.version>1.4.2</azure-functions-java-library.version>
         <kotlin.version>1.6.0</kotlin.version>
         <kotlin.coroutine.version>1.5.2</kotlin.coroutine.version>
@@ -2098,16 +2097,6 @@
             <dependency>
                 <groupId>io.quarkus</groupId>
                 <artifactId>quarkus-amazon-iam-deployment</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.quarkus</groupId>
-                <artifactId>quarkus-amazon-alexa</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.quarkus</groupId>
-                <artifactId>quarkus-amazon-alexa-deployment</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -5038,44 +5027,6 @@
                 <artifactId>apache-client</artifactId>
                 <version>${awssdk.version}</version>
                 <exclusions>
-                    <exclusion>
-                        <groupId>commons-logging</groupId>
-                        <artifactId>commons-logging</artifactId>
-                    </exclusion>
-                </exclusions>
-            </dependency>
-            <dependency>
-                <groupId>com.amazon.alexa</groupId>
-                <artifactId>ask-sdk</artifactId>
-                <version>${aws-alexa-sdk.version}</version>
-                <exclusions>
-                    <exclusion>
-                        <groupId>org.apache.logging.log4j</groupId>
-                        <artifactId>log4j-slf4j-impl</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>commons-logging</groupId>
-                        <artifactId>commons-logging</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>joda-time</groupId>
-                        <artifactId>joda-time</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>com.amazon.alexa</groupId>
-                        <artifactId>ask-sdk-apache-client</artifactId>
-                    </exclusion>
-                </exclusions>
-            </dependency>
-            <dependency>
-                <groupId>com.amazon.alexa</groupId>
-                <artifactId>ask-sdk-apache-client</artifactId>
-                <version>${aws-alexa-sdk.version}</version>
-                <exclusions>
-                    <exclusion>
-                        <groupId>com.amazon.alexa</groupId>
-                        <artifactId>ask-sdk-model-runtime</artifactId>
-                    </exclusion>
                     <exclusion>
                         <groupId>commons-logging</groupId>
                         <artifactId>commons-logging</artifactId>
