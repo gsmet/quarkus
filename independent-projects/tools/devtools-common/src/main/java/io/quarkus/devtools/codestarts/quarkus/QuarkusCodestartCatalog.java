@@ -55,8 +55,7 @@ public final class QuarkusCodestartCatalog extends GenericCodestartCatalog<Quark
 
     public enum Language implements DataKey {
         JAVA,
-        KOTLIN,
-        SCALA
+        KOTLIN
     }
 
     public enum Tooling implements DataKey {

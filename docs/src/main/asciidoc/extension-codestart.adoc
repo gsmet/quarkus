@@ -40,7 +40,7 @@ Codestarts are working the same way when contributing to the generation of a pro
 
 * project: The project skeleton (e.g. a Quarkus project)
 * buildtool: The build tool (e.g. Maven, Gradle, Gradle with Kotlin DSL)
-* language: The coding language (e.g. Java, Kotlin, Scala)
+* language: The coding language (e.g. Java, Kotlin)
 * config: The config type (e.g. yaml, properties)
 
 **Extra codestarts (as much as wanted, to put on top):**
@@ -135,7 +135,7 @@ Using the CLI or Maven plugin to generate a project with your codestart:
 
 You have to use `org.acme` as the package name in your extension codestart sources. In the generated project, the user specified package will be used (and auto-replace `org.acme`).
 
-It will be auto-replaced in all the source files (.java, .kt, .scala). The package directory will also be automatically adjusted. If for some reason, another type of file needs the user package name then you should use a <<qute-templates>> for it and `{project.package-name}` data placeholder (https://github.com/quarkusio/quarkus/blob/main/devtools/project-core-extension-codestarts/src/main/resources/codestarts/quarkus/extension-codestarts/grpc-codestart/base/src/main/proto/hello.tpl.qute.proto#L4[find an example in the grpc proto file, window="_blank"]).
+It will be auto-replaced in all the source files (.java, .kt). The package directory will also be automatically adjusted. If for some reason, another type of file needs the user package name then you should use a <<qute-templates>> for it and `{project.package-name}` data placeholder (https://github.com/quarkusio/quarkus/blob/main/devtools/project-core-extension-codestarts/src/main/resources/codestarts/quarkus/extension-codestarts/grpc-codestart/base/src/main/proto/hello.tpl.qute.proto#L4[find an example in the grpc proto file, window="_blank"]).
 
 [#codestart-yml]
 === codestart.yml
@@ -172,7 +172,7 @@ NOTE: `codestart.yml` is the only required file.
 
 * `codestart.yml` must be at the root of the codestart
 * `./base` contains all the files that will be processed independently of the specified language
-* `./[java/kotlin/scala]` contains all the files that will be processed only if the specified language has been selected (overriding base)
+* `./[java/kotlin]` contains all the files that will be processed only if the specified language has been selected (overriding base)
 
 === Naming Convention for files
 

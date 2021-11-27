@@ -7,9 +7,7 @@ import java.util.Optional;
 public enum SourceType {
     JAVA(MojoUtils.JAVA_FILE_EXTENSION, MojoUtils.JAVA_EXTENSION_NAME),
 
-    KOTLIN(MojoUtils.KOTLIN_FILE_EXTENSION, MojoUtils.KOTLIN_EXTENSION_NAME),
-
-    SCALA(MojoUtils.SCALA_FILE_EXTENSION, MojoUtils.SCALA_EXTENSION_NAME);
+    KOTLIN(MojoUtils.KOTLIN_FILE_EXTENSION, MojoUtils.KOTLIN_EXTENSION_NAME);
 
     private static final String srcDirPrefix = "src/main/";
     private static final String testSrcDirPrefix = "src/test/";

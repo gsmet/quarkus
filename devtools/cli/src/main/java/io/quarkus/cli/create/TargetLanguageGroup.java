@@ -17,21 +17,16 @@ public class TargetLanguageGroup {
     @CommandLine.Option(names = { "--kotlin" }, description = "Use Kotlin")
     boolean kotlin = false;
 
-    @CommandLine.Option(names = { "--scala" }, description = "Use Scala")
-    boolean scala = false;
-
     public SourceType getSourceType(BuildTool buildTool, Set<String> extensions, OutputOptionMixin output) {
         if (sourceType == null) {
             if (buildTool == null) {
                 // Buildless/JBang only works with Java, atm
                 sourceType = SourceType.JAVA;
-                if (kotlin || scala) {
+                if (kotlin) {
                     output.warn("JBang only supports Java. Using Java as the target language.");
                 }
             } else if (kotlin || BuildTool.GRADLE_KOTLIN_DSL == buildTool) {
                 sourceType = SourceType.KOTLIN;
-            } else if (scala) {
-                sourceType = SourceType.SCALA;
             } else {
                 sourceType = CreateProjectHelper.determineSourceType(extensions);
             }
@@ -41,7 +36,7 @@ public class TargetLanguageGroup {
 
     @Override
     public String toString() {
-        return "TargetLanguageGroup [java=" + java + ", kotlin=" + kotlin + ", scala=" + scala + ", sourceType=" + sourceType
+        return "TargetLanguageGroup [java=" + java + ", kotlin=" + kotlin + ", sourceType=" + sourceType
                 + "]";
     }
 }

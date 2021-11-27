@@ -31,8 +31,6 @@ public final class QuarkusCodestartData {
 
         JAVA_VERSION("java.version"),
         KOTLIN_VERSION("kotlin.version"),
-        SCALA_VERSION("scala.version"),
-        SCALA_MAVEN_PLUGIN_VERSION("scala-maven-plugin.version"),
         MAVEN_COMPILER_PLUGIN_VERSION("maven-compiler-plugin.version"),
         MAVEN_SUREFIRE_PLUGIN_VERSION("maven-surefire-plugin.version"),
 
@@ -76,8 +74,6 @@ public final class QuarkusCodestartData {
 
         JAVA_VERSION("java_target"),
         KOTLIN_VERSION("kotlin_version"),
-        SCALA_VERSION("scala_version"),
-        SCALA_MAVEN_PLUGIN_VERSION("scala_plugin_version"),
         MAVEN_COMPILER_PLUGIN_VERSION("compiler_plugin_version"),
         MAVEN_SUREFIRE_PLUGIN_VERSION("surefire_plugin_version"),
 

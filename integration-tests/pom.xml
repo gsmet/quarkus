@@ -221,7 +221,6 @@
                 <module>virtual-http</module>
                 <module>virtual-http-resteasy</module>
                 <module>maven</module>
-                <module>scala</module>
                 <module>kotlin</module>
                 <module>mongodb-panache</module>
                 <module>mongodb-panache-kotlin</module>

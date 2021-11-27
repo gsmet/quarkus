@@ -23,8 +23,7 @@
           "name": "resteasy-reactive",
           "languages": [
             "java",
-            "kotlin",
-            "scala"
+            "kotlin"
           ],
           "artifact": "io.quarkus:fake-artifact"
         },
@@ -85,8 +84,7 @@
           "name": "resteasy",
           "languages": [
             "java",
-            "kotlin",
-            "scala"
+            "kotlin"
           ],
           "artifact": "io.quarkus:fake-artifact"
         },
@@ -114,8 +112,7 @@
           "name": "spring-web",
           "languages": [
             "java",
-            "kotlin",
-            "scala"
+            "kotlin"
           ],
           "artifact": "io.quarkus:fake-artifact"
         },
@@ -146,29 +143,6 @@
         "built-with-quarkus-core": "999-FAKE"
       },
       "artifact": "io.quarkus:quarkus-kotlin::jar:999-FAKE",
-      "origins": [
-        "io.quarkus:quarkus-fake-bom:999-FAKE:json:999-FAKE"
-      ]
-    },
-    {
-      "name": "Scala",
-      "description": "Write your services in Scala",
-      "metadata": {
-        "keywords": [
-          "scala"
-        ],
-        "categories": [
-          "alt-languages"
-        ],
-        "status": "preview",
-        "codestart": {
-          "name": "scala",
-          "kind": "core",
-          "artifact": "io.quarkus:fake-artifact"
-        },
-        "built-with-quarkus-core": "999-FAKE"
-      },
-      "artifact": "io.quarkus:quarkus-scala::jar:999-FAKE",
       "origins": [
         "io.quarkus:quarkus-fake-bom:999-FAKE:json:999-FAKE"
       ]
@@ -319,8 +293,6 @@
         "compiler-plugin-version": "3.8.1",
         "surefire-plugin-version": "3.0.0-M5",
         "kotlin-version": "1.4.31",
-        "scala-version": "2.12.13",
-        "scala-plugin-version": "4.4.0",
         "quarkus-core-version": "999-FAKE",
         "maven-plugin-groupId": "io.quarkus",
         "maven-plugin-artifactId": "quarkus-maven-plugin",

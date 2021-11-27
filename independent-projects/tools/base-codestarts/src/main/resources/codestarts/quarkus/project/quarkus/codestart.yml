@@ -15,7 +15,6 @@ output-strategy:
   "src/test/resources/application.properties": forbidden
   "*.java": smart-package
   "*.kt": smart-package
-  "*.scala": smart-package
   "*": fail-on-duplicate
 language:
   base:

@@ -211,7 +211,6 @@ public class QuarkusPluginExtension {
 
     /**
      * Returns the last file from the specified {@link FileCollection}.
-     * Needed for the Scala plugin.
      */
     private File getLastFile(FileCollection fileCollection) {
         File result = null;
