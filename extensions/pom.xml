@@ -177,9 +177,6 @@
         <module>smallrye-graphql</module>
         <module>smallrye-graphql-client</module>
 
-        <!-- Logging -->
-        <module>logging-sentry</module>
-
         <!-- Templating -->
         <module>qute</module>
 

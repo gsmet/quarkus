@@ -111,8 +111,6 @@ updates:
       - dependency-name: io.micrometer:micrometer-bom
       # BouncyCastle
       - dependency-name: org.bouncycastle:*
-      # Logstash
-      - dependency-name: io.sentry:*
       # MongoDB
       - dependency-name: org.mongodb:*
       # Avro
