@@ -22,6 +22,7 @@ public enum Feature {
     APICURIO_REGISTRY_AVRO,
     ARTEMIS_CORE,
     ARTEMIS_JMS,
+    AWT,
     CACHE,
     CDI,
     CONFIG_YAML,
