@@ -18,6 +18,10 @@ jobs:
           distribution: temurin
           java-version: 11
           cache: maven
+      - name: Configure Git author
+        run: |
+          git config --local user.name "github-actions"
+          git config --local user.email "github-actions@github.com"
       - name: Install JBang
         run: |
           curl -Ls https://sh.jbang.dev | bash -s - app setup
@@ -29,8 +33,6 @@ jobs:
           REWRITE_NO_TESTS=true ./jakarta/transform.sh
           git add .
           git commit -m 'Transform sources to Jakarta'
-          git config user.name github-actions
-          git config user.email github-actions@github.com
           git push origin main:jakarta-rewrite --force
           git push origin temp-jakarta-rewrite:jakarta-rewrite
         shell: bash
