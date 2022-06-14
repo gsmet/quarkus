@@ -10,17 +10,10 @@ on:
         description: 'JDK version'
         required: true
         # make sure to keep the default of JDK_VERSION in sync!
-        default: '18-ea'
-      jdkDistribution:
-        description: 'JDK distribution'
-        required: true
-        # make sure to keep the default of JDK_DIST in sync!
-        # might need to use 'zulu' until 'temurin' dist is available
-        default: 'temurin'
+        default: '19'
 
 env:
-  JDK_VERSION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.jdkVersion || '18-ea' }}
-  JDK_DIST: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.jdkDistribution || 'temurin' }}
+  JDK_VERSION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.jdkVersion || '19' }}
   # Workaround testsuite locale issue
   LANG: en_US.UTF-8
   MAVEN_OPTS: -Xmx2g -XX:MaxMetaspaceSize=1g
@@ -37,12 +30,11 @@ jobs:
     env:
       MAVEN_OPTS: -Xmx2048m -XX:MaxMetaspaceSize=1000m
     steps:
-
-      - name: Set up JDK
-        uses: actions/setup-java@v2
+      - name: Set up latest JDK ${{ matrix.java.name }} from jdk.java.net
+        uses: oracle-actions/setup-java@v1
         with:
-          distribution: ${{ env.JDK_DIST }}
-          java-version: ${{ env.JDK_VERSION }}
+          website: jdk.java.net
+          release: ${{ env.JDK_VERSION }}
       - name: Print Java version
         shell: bash
         run: java -version
