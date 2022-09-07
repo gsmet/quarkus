@@ -28,7 +28,7 @@ import io.quarkus.gizmo.Gizmo;
  */
 public class ClassTransformerProcessor {
 
-    private static final DotName PATH = DotName.createSimple("javax.ws.rs.Path");
+    private static final DotName PATH = DotName.createSimple("jakarta.ws.rs.Path");
 
     @BuildStep
     public void build(CombinedIndexBuildItem combinedIndex,

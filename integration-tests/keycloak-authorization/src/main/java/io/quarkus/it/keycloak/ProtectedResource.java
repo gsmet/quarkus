@@ -5,14 +5,15 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import javax.inject.Inject;
 import javax.security.auth.AuthPermission;
-import javax.ws.rs.ForbiddenException;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.Path;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.Context;
+
+import jakarta.inject.Inject;
+import jakarta.ws.rs.ForbiddenException;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.Context;
 
 import org.keycloak.authorization.client.AuthzClient;
 import org.keycloak.representations.idm.authorization.Permission;

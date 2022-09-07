@@ -2,7 +2,7 @@ package io.quarkus.it.hibernate.search.elasticsearch.analysis;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import javax.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.ApplicationScoped;
 
 @ApplicationScoped
 public class MyCdiContext {

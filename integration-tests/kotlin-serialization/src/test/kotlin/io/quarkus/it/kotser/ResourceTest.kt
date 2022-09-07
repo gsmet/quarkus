@@ -8,7 +8,7 @@ import io.restassured.module.kotlin.extensions.When
 import org.hamcrest.CoreMatchers
 import org.hamcrest.CoreMatchers.`is`
 import org.junit.jupiter.api.Test
-import javax.ws.rs.core.MediaType
+import jakarta.ws.rs.core.MediaType
 
 @QuarkusTest
 open class ResourceTest {

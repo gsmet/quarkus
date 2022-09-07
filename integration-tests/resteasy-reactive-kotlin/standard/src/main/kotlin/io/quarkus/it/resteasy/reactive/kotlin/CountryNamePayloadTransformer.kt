@@ -3,7 +3,7 @@ package io.quarkus.it.resteasy.reactive.kotlin
 import kotlinx.coroutines.delay
 import org.eclipse.microprofile.reactive.messaging.Incoming
 import org.eclipse.microprofile.reactive.messaging.Outgoing
-import javax.enterprise.context.ApplicationScoped
+import jakarta.enterprise.context.ApplicationScoped
 
 @ApplicationScoped
 class CountryNamePayloadTransformer {

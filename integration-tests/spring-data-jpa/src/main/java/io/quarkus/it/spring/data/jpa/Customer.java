@@ -2,12 +2,12 @@ package io.quarkus.it.spring.data.jpa;
 
 import java.util.Set;
 
-import javax.json.bind.annotation.JsonbTransient;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.FetchType;
-import javax.persistence.OneToMany;
-import javax.validation.constraints.Email;
+import jakarta.json.bind.annotation.JsonbTransient;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.OneToMany;
+import jakarta.validation.constraints.Email;
 
 import org.springframework.data.domain.Persistable;
 

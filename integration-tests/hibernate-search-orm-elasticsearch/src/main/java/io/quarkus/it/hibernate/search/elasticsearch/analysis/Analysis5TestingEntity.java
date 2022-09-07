@@ -1,6 +1,6 @@
 package io.quarkus.it.hibernate.search.elasticsearch.analysis;
 
-import javax.persistence.Entity;
+import jakarta.persistence.Entity;
 
 import org.hibernate.search.mapper.pojo.mapping.definition.annotation.FullTextField;
 import org.hibernate.search.mapper.pojo.mapping.definition.annotation.Indexed;

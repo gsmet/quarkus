@@ -4,8 +4,8 @@ import java.net.URI;
 import java.util.Collections;
 import java.util.Set;
 
-import javax.enterprise.context.ApplicationScoped;
-import javax.inject.Named;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Named;
 
 import io.quarkus.redis.client.RedisHostsProvider;
 

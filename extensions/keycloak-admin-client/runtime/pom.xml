@@ -32,7 +32,7 @@
         </dependency>
         <dependency>
             <groupId>org.keycloak</groupId>
-            <artifactId>keycloak-admin-client</artifactId>
+            <artifactId>keycloak-admin-client-jakarta</artifactId>
             <exclusions>
                 <exclusion>
                     <groupId>org.jboss.resteasy</groupId>

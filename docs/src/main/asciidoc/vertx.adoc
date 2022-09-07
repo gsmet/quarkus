@@ -117,8 +117,8 @@ package org.acme;
 
 import io.vertx.mutiny.core.Vertx;
 
-import javax.inject.Inject;
-import javax.ws.rs.Path;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.Path;
 
 @Path("/vertx")                        // <1>
 public class VertxResource {
@@ -300,7 +300,7 @@ package org.acme;
 
 import io.quarkus.vertx.ConsumeEvent;
 
-import javax.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.ApplicationScoped;
 
 @ApplicationScoped                          // <1>
 public class GreetingService {

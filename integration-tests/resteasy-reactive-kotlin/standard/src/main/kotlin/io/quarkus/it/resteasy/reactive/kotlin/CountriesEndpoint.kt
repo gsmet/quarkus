@@ -5,9 +5,9 @@ import kotlinx.coroutines.delay
 import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Emitter
 import org.eclipse.microprofile.rest.client.inject.RestClient
-import javax.ws.rs.GET
-import javax.ws.rs.POST
-import javax.ws.rs.Path
+import jakarta.ws.rs.GET
+import jakarta.ws.rs.POST
+import jakarta.ws.rs.Path
 
 @Path("country")
 class CountriesEndpoint(@RestClient private val countriesGateway: CountriesGateway,

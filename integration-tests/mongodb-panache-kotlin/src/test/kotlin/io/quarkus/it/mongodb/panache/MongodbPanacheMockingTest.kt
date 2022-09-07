@@ -15,8 +15,8 @@ import org.junit.jupiter.api.condition.DisabledOnOs
 import org.junit.jupiter.api.condition.OS
 import org.mockito.Mockito
 import java.util.Collections
-import javax.inject.Inject
-import javax.ws.rs.WebApplicationException
+import jakarta.inject.Inject
+import jakarta.ws.rs.WebApplicationException
 
 @QuarkusTest
 @DisabledOnOs(OS.WINDOWS)

@@ -8,9 +8,9 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.eclipse.microprofile.rest.client.RestClientBuilder
 import java.net.URI
-import javax.enterprise.context.ApplicationScoped
-import javax.enterprise.event.Observes
-import javax.ws.rs.Path
+import jakarta.enterprise.context.ApplicationScoped
+import jakarta.enterprise.event.Observes
+import jakarta.ws.rs.Path
 
 @Path("/")
 @ApplicationScoped

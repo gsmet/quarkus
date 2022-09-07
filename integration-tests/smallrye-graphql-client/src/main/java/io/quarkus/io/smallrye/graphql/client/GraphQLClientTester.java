@@ -9,9 +9,9 @@ import static io.smallrye.graphql.client.core.Operation.operation;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
 
 import io.smallrye.graphql.client.Response;
 import io.smallrye.graphql.client.core.Document;

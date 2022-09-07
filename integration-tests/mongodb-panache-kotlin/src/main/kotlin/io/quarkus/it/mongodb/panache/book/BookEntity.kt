@@ -8,7 +8,7 @@ import org.bson.codecs.pojo.annotations.BsonIgnore
 import org.bson.codecs.pojo.annotations.BsonProperty
 import org.bson.types.ObjectId
 import java.time.LocalDate
-import javax.json.bind.annotation.JsonbDateFormat
+import jakarta.json.bind.annotation.JsonbDateFormat
 
 @MongoEntity(collection = "TheBookEntity", clientName = "cl2")
 class BookEntity : PanacheMongoEntity() {

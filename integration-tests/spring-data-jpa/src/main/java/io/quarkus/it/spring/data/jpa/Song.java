@@ -3,12 +3,12 @@ package io.quarkus.it.spring.data.jpa;
 import java.util.HashSet;
 import java.util.Set;
 
-import javax.json.bind.annotation.JsonbTransient;
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.Id;
-import javax.persistence.ManyToMany;
-import javax.persistence.SequenceGenerator;
+import jakarta.json.bind.annotation.JsonbTransient;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.Id;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.SequenceGenerator;
 
 @Entity
 public class Song {

@@ -4,11 +4,11 @@ import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.Map;
 
-import javax.enterprise.context.ApplicationScoped;
-import javax.json.Json;
-import javax.json.JsonObject;
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.json.Json;
+import jakarta.json.JsonObject;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
 
 import com.github.benmanes.caffeine.cache.CacheLoader;
 

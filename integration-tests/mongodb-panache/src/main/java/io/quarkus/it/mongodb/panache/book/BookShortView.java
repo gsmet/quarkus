@@ -2,7 +2,7 @@ package io.quarkus.it.mongodb.panache.book;
 
 import java.time.LocalDate;
 
-import javax.json.bind.annotation.JsonbDateFormat;
+import jakarta.json.bind.annotation.JsonbDateFormat;
 
 import io.quarkus.mongodb.panache.common.ProjectionFor;
 

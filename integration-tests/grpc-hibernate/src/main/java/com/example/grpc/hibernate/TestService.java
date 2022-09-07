@@ -2,9 +2,9 @@ package com.example.grpc.hibernate;
 
 import java.util.List;
 
-import javax.inject.Inject;
-import javax.persistence.EntityManager;
-import javax.transaction.Transactional;
+import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
+import jakarta.transaction.Transactional;
 
 import com.example.test.Test;
 import com.example.test.TestOuterClass;

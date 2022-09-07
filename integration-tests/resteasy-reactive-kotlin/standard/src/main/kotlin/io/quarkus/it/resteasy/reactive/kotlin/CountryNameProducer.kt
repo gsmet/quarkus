@@ -2,7 +2,7 @@ package io.quarkus.it.resteasy.reactive.kotlin
 
 import io.smallrye.mutiny.Multi
 import org.eclipse.microprofile.reactive.messaging.Outgoing
-import javax.enterprise.context.ApplicationScoped
+import jakarta.enterprise.context.ApplicationScoped
 
 @ApplicationScoped
 class CountryNameProducer {
