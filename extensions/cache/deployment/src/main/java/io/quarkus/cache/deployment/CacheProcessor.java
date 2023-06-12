@@ -39,6 +39,7 @@ import org.jboss.jandex.MethodInfo;
 import org.jboss.jandex.Type;
 import org.jboss.logging.Logger;
 
+import io.quarkus.arc.deployment.AdditionalBeanBuildItem;
 import io.quarkus.arc.deployment.AnnotationsTransformerBuildItem;
 import io.quarkus.arc.deployment.AutoInjectAnnotationBuildItem;
 import io.quarkus.arc.deployment.BeanDiscoveryFinishedBuildItem;
@@ -46,7 +47,12 @@ import io.quarkus.arc.deployment.SyntheticBeanBuildItem;
 import io.quarkus.arc.deployment.UnremovableBeanBuildItem;
 import io.quarkus.arc.deployment.ValidationPhaseBuildItem.ValidationErrorBuildItem;
 import io.quarkus.arc.processor.BeanInfo;
+import io.quarkus.arc.processor.DotNames;
+import io.quarkus.cache.CacheInvalidate;
+import io.quarkus.cache.CacheInvalidateAll;
 import io.quarkus.cache.CacheManager;
+import io.quarkus.cache.CacheName;
+import io.quarkus.cache.CacheResult;
 import io.quarkus.cache.deployment.exception.ClassTargetException;
 import io.quarkus.cache.deployment.exception.KeyGeneratorConstructorException;
 import io.quarkus.cache.deployment.exception.PrivateMethodTargetException;
@@ -57,11 +63,13 @@ import io.quarkus.cache.deployment.spi.CacheManagerInfoBuildItem;
 import io.quarkus.cache.runtime.CacheInvalidateAllInterceptor;
 import io.quarkus.cache.runtime.CacheInvalidateInterceptor;
 import io.quarkus.cache.runtime.CacheManagerRecorder;
+import io.quarkus.cache.runtime.CacheProducer;
 import io.quarkus.cache.runtime.CacheResultInterceptor;
 import io.quarkus.deployment.Feature;
 import io.quarkus.deployment.annotations.BuildProducer;
 import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.annotations.Record;
+import io.quarkus.deployment.builditem.AdditionalIndexedClassesBuildItem;
 import io.quarkus.deployment.builditem.BytecodeTransformerBuildItem;
 import io.quarkus.deployment.builditem.CombinedIndexBuildItem;
 import io.quarkus.deployment.builditem.FeatureBuildItem;
@@ -90,6 +98,20 @@ class CacheProcessor {
     @BuildStep
     RestClientAnnotationsTransformerBuildItem restClientAnnotationsTransformer() {
         return new RestClientAnnotationsTransformerBuildItem(new RestClientCacheAnnotationsTransformer());
+    }
+
+    @BuildStep
+    void additionalBeans(BuildProducer<AdditionalBeanBuildItem> additionalBeans,
+            BuildProducer<AdditionalIndexedClassesBuildItem> additionalIndexedClasses) {
+        additionalBeans.produce(new AdditionalBeanBuildItem.Builder()
+                .addBeanClass(CacheProducer.class)
+                .setDefaultScope(DotNames.APPLICATION_SCOPED)
+                .build());
+        additionalBeans.produce(new AdditionalBeanBuildItem(CacheResultInterceptor.class, CacheInvalidateInterceptor.class,
+                CacheInvalidateAllInterceptor.class, CacheName.class));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(CacheResult.class.getName(),
+                CacheInvalidate.class.getName(),
+                CacheInvalidateAll.class.getName()));
     }
 
     @BuildStep
@@ -269,7 +291,8 @@ class CacheProcessor {
 
     @BuildStep
     List<BytecodeTransformerBuildItem> enhanceRestClientMethods(CombinedIndexBuildItem combinedIndex,
-            BuildProducer<UnremovableBeanBuildItem> unremovableBeans) {
+            BuildProducer<UnremovableBeanBuildItem> unremovableBeans,
+            BuildProducer<AdditionalBeanBuildItem> additionalBeans) {
         List<BytecodeTransformerBuildItem> bytecodeTransformers = new ArrayList<>();
         boolean cacheInvalidate = false;
         boolean cacheResult = false;

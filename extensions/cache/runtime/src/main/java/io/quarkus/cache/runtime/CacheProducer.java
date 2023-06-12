@@ -2,7 +2,6 @@ package io.quarkus.cache.runtime;
 
 import java.lang.annotation.Annotation;
 
-import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
 import jakarta.enterprise.inject.spi.InjectionPoint;
 import jakarta.inject.Inject;
@@ -11,7 +10,6 @@ import io.quarkus.cache.Cache;
 import io.quarkus.cache.CacheManager;
 import io.quarkus.cache.CacheName;
 
-@ApplicationScoped
 public class CacheProducer {
 
     @Inject

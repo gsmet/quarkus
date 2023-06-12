@@ -10,7 +10,7 @@ import io.quarkus.runtime.StartupEvent;
  */
 public class CacheManagerInitializer {
 
-    private static void onStartup(@Observes StartupEvent event, CacheManager cacheManager) {
+    static void onStartup(@Observes StartupEvent event, CacheManager cacheManager) {
         cacheManager.getCacheNames();
     }
 }
