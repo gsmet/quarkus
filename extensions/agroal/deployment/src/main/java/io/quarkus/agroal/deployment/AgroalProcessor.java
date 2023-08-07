@@ -17,7 +17,6 @@ import javax.sql.XADataSource;
 import jakarta.enterprise.inject.Default;
 import jakarta.inject.Singleton;
 
-import org.jboss.jandex.ClassType;
 import org.jboss.jandex.DotName;
 import org.jboss.logging.Logger;
 
@@ -277,10 +276,9 @@ class AgroalProcessor {
                     .scope(Singleton.class)
                     .setRuntimeInit()
                     .unremovable()
-                    .addInjectionPoint(ClassType.create(DotName.createSimple(DataSources.class)))
                     // pass the runtime config into the recorder to ensure that the DataSource related beans
                     // are created after runtime configuration has been set up
-                    .createWith(recorder.agroalDataSourceSupplier(dataSourceName, dataSourcesRuntimeConfig));
+                    .supplier(recorder.agroalDataSourceSupplier(dataSourceName, dataSourcesRuntimeConfig));
 
             if (aggregatedBuildTimeConfigBuildItem.isDefault()) {
                 configurator.addQualifier(Default.class);
