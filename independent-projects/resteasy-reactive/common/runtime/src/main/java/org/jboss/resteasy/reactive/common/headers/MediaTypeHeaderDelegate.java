@@ -150,7 +150,7 @@ public class MediaTypeHeaderDelegate implements RuntimeDelegate.HeaderDelegate<M
         if (type.getParameters() == null || type.getParameters().size() == 0)
             return buf.toString();
         for (String name : type.getParameters().keySet()) {
-            buf.append(';').append(name).append('=');
+            buf.append(';').append(' ').append(name).append('=');
             String val = type.getParameters().get(name);
             if (quoted(val))
                 buf.append('"').append(val).append('"');

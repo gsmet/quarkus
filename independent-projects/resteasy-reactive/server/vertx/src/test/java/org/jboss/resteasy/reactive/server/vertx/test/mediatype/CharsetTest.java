@@ -35,7 +35,7 @@ public class CharsetTest {
                 .then()
                 .statusCode(200)
                 .extract().header("Content-Type");
-        assertEquals("text/plain;charset=UTF-8", contentType);
+        assertEquals("text/plain; charset=UTF-8", contentType);
     }
 
     @Test
@@ -44,7 +44,7 @@ public class CharsetTest {
                 .then()
                 .statusCode(200)
                 .extract().header("Content-Type");
-        assertEquals("text/plain;charset=UTF-8", contentType);
+        assertEquals("text/plain; charset=UTF-8", contentType);
     }
 
     @Test
@@ -53,7 +53,7 @@ public class CharsetTest {
                 .then()
                 .statusCode(200)
                 .extract().header("Content-Type");
-        assertEquals("application/json;charset=UTF-8", contentType);
+        assertEquals("application/json; charset=UTF-8", contentType);
     }
 
     @Test
