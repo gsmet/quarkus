@@ -43,3 +43,9 @@ time sudo rm -rf /usr/local/lib/android
 time sudo rm -rf /opt/ghc
 # Remove pipx
 time sudo rm -rf /opt/pipx
+
+# Remove infrastructure things that we hope are unused
+time sudo rm -rf /opt/hostedtoolcache/CodeQL
+time sudo rm -rf /imagegeneration/installers/go-*
+time sudo rm -rf /imagegeneration/installers/node-*
+time sudo rm -rf /imagegeneration/installers/python-*
