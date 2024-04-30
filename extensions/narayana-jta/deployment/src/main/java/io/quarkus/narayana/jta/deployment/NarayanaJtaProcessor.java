@@ -160,9 +160,12 @@ class NarayanaJtaProcessor {
     @Record(STATIC_INIT)
     public void allowUnsafeMultipleLastResources(NarayanaJtaRecorder recorder,
             TransactionManagerBuildTimeConfig transactionManagerBuildTimeConfig,
-            Capabilities capabilities) {
+            Capabilities capabilities, BuildProducer<LogCleanupFilterBuildItem> logCleanupFilters) {
         if (transactionManagerBuildTimeConfig.allowUnsafeMultipleLastResources) {
             recorder.allowUnsafeMultipleLastResources(capabilities.isPresent(Capability.AGROAL));
+
+            // we don't want to flood the logs with warnings
+            logCleanupFilters.produce(new LogCleanupFilterBuildItem("com.arjuna.ats.arjuna", "ARJUNA012141"));
         }
     }
 
