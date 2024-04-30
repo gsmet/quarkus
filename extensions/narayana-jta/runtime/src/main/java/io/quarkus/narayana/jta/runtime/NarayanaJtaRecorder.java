@@ -122,6 +122,11 @@ public class NarayanaJtaRecorder {
         }
     }
 
+    public void logAllowUnsafeMultipleLastResources() {
+        log.warn(
+                "Setting quarkus.transaction-manager.allow-unsafe-multiple-last-resources to true makes adding multiple resources to the same transaction unsafe.");
+    }
+
     private void setObjectStoreDir(String name, TransactionManagerConfiguration config) {
         BeanPopulator.getNamedInstance(ObjectStoreEnvironmentBean.class, name).setObjectStoreDir(config.objectStore.directory);
     }

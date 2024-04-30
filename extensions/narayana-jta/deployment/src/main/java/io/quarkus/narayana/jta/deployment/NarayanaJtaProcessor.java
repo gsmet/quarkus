@@ -97,7 +97,8 @@ class NarayanaJtaProcessor {
             BuildProducer<ReflectiveClassBuildItem> reflectiveClass,
             BuildProducer<RuntimeInitializedClassBuildItem> runtimeInit,
             BuildProducer<FeatureBuildItem> feature,
-            TransactionManagerConfiguration transactions, ShutdownContextBuildItem shutdownContextBuildItem) {
+            TransactionManagerConfiguration transactions, TransactionManagerBuildTimeConfig transactionManagerBuildTimeConfig,
+            ShutdownContextBuildItem shutdownContextBuildItem) {
         recorder.handleShutdown(shutdownContextBuildItem, transactions);
         feature.produce(new FeatureBuildItem(Feature.NARAYANA_JTA));
         additionalBeans.produce(new AdditionalBeanBuildItem(NarayanaJtaProducers.class));
@@ -141,6 +142,10 @@ class NarayanaJtaProcessor {
         builder.addBeanClass(TransactionalInterceptorNotSupported.class);
         additionalBeans.produce(builder.build());
 
+        if (transactionManagerBuildTimeConfig.allowUnsafeMultipleLastResources) {
+            recorder.logAllowUnsafeMultipleLastResources();
+        }
+
         //we want to force Arjuna to init at static init time
         Properties defaultProperties = PropertiesFactory.getDefaultProperties();
         //we don't want to store the system properties here
@@ -148,6 +153,7 @@ class NarayanaJtaProcessor {
         for (Object i : System.getProperties().keySet()) {
             defaultProperties.remove(i);
         }
+
         recorder.setDefaultProperties(defaultProperties);
         // This must be done before setNodeName as the code in setNodeName will create a TSM based on the value of this property
         recorder.disableTransactionStatusManager();
