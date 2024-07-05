@@ -2,8 +2,13 @@ package io.quarkus.devui.tests;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.WebSocket;
+import java.net.http.WebSocket.Listener;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -19,25 +24,19 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import io.vertx.core.Vertx;
-import io.vertx.core.buffer.Buffer;
-import io.vertx.core.http.HttpClient;
-import io.vertx.core.http.HttpClientOptions;
-import io.vertx.core.http.WebSocket;
-import io.vertx.core.http.WebSocketConnectOptions;
-
 public class DevUIJsonRPCTest {
 
     protected static final Logger log = Logger.getLogger(DevUIJsonRPCTest.class);
 
-    protected URI uri;
+    private final URI websocketUri;
 
     private final ObjectMapper mapper = new ObjectMapper();
     private final JsonFactory factory = mapper.getFactory();
     private final Random random = new Random();
 
     private final String namespace;
-    private final String testUrl;
+
+    private final HttpClient httpClient;
 
     public DevUIJsonRPCTest(String namespace) {
         this(namespace, ConfigProvider.getConfig().getValue("test.url", String.class));
@@ -45,13 +44,18 @@ public class DevUIJsonRPCTest {
 
     public DevUIJsonRPCTest(String namespace, String testUrl) {
         this.namespace = namespace;
-        this.testUrl = testUrl;
         String nonApplicationRoot = ConfigProvider.getConfig()
                 .getOptionalValue("quarkus.http.non-application-root-path", String.class).orElse("q");
         if (!nonApplicationRoot.startsWith("/")) {
             nonApplicationRoot = "/" + nonApplicationRoot;
         }
-        this.uri = URI.create(testUrl + nonApplicationRoot + "/dev-ui/json-rpc-ws");
+        websocketUri = URI.create("ws" + testUrl.substring(4) + nonApplicationRoot + "/dev-ui/json-rpc-ws");
+
+        // we used to rely on the Vert.x HTTP client here but this is a problem for dev mode tests
+        // as we ended up attempting to load the Vert.x classes from the root app class loader
+        // while they were already loaded by one of the child QuarkusClassLoader
+        // while imperfect, relying on the JDK HttpClient is safer
+        this.httpClient = HttpClient.newHttpClient();
     }
 
     public <T> T executeJsonRPCMethod(TypeReference typeReference, String methodName) throws Exception {
@@ -189,47 +193,41 @@ public class DevUIJsonRPCTest {
     private int sendRequest(String methodName, Map<String, Object> params) throws IOException {
         int id = random.nextInt(Integer.MAX_VALUE);
         String request = createJsonRPCRequest(id, methodName, params);
-        log.debug("request = " + request);
+        log.debugf("WebSocket request = %s", request);
 
-        Vertx vertx = Vertx.vertx();
+        var listener = new WebSocket.Listener() {
 
-        HttpClientOptions options = new HttpClientOptions()
-                .setDefaultHost(this.uri.getHost())
-                .setDefaultPort(this.uri.getPort());
+            // this is not exactly safe but we don't expect concurrency in our scenario
+            private StringBuffer buffer = new StringBuffer();
 
-        HttpClient client = vertx.createHttpClient(options);
+            @Override
+            public CompletionStage<Void> onText(WebSocket webSocket, CharSequence data, boolean last) {
+                buffer.append(data);
 
-        WebSocketConnectOptions socketOptions = new WebSocketConnectOptions()
-                .setHost(this.uri.getHost())
-                .setPort(this.uri.getPort())
-                .setURI(this.uri.getPath());
+                if (last) {
+                    String fullResponse = buffer.toString();
+                    buffer.setLength(0);
 
-        client.webSocket(socketOptions, ar -> {
-            if (ar.succeeded()) {
-                WebSocket socket = ar.result();
-                Buffer accumulatedBuffer = Buffer.buffer();
+                    RESPONSES.put(id, new WebSocketResponse(fullResponse.toString()));
+                } else {
+                    webSocket.request(1);
+                }
 
-                socket.frameHandler((e) -> {
-                    Buffer b = accumulatedBuffer.appendBuffer(e.binaryData());
-                    if (e.isFinal()) {
-                        RESPONSES.put(id, new WebSocketResponse(b.toString()));
-                    }
-                });
-
-                socket.writeTextMessage(request);
-
-                socket.exceptionHandler((e) -> {
-                    RESPONSES.put(id, new WebSocketResponse(e));
-                    vertx.close();
-                });
-                socket.closeHandler(v -> {
-                    vertx.close();
-                });
-            } else {
-                RESPONSES.put(id, new WebSocketResponse(ar.cause()));
-                vertx.close();
+                return CompletableFuture.completedFuture(data)
+                        .thenAccept(d -> log.debugf("WebSocket response: %s", data));
             }
-        });
+
+            @Override
+            public void onError(WebSocket webSocket, Throwable error) {
+                RESPONSES.put(id, new WebSocketResponse(error));
+
+                log.debugf("WebSocket error: %s", error);
+            }
+        };
+
+        WebSocket webSocket = httpClient.newWebSocketBuilder().buildAsync(this.websocketUri, listener).join();
+        webSocket.sendText(request, true).join();
+
         return id;
     }
 
