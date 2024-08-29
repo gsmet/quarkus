@@ -101,7 +101,8 @@ public final class RunnerClassLoader extends ClassLoader {
         }
         if (resources != null) {
             String classResource = fromClassNameToResourceName(name);
-            for (ClassLoadingResource resource : resources) {
+            for (int i = 0; i < resources.length; i++) {
+                ClassLoadingResource resource = resources[i];
                 accessingResource(resource);
                 byte[] data = resource.getResourceData(classResource);
                 if (data == null) {
@@ -116,8 +117,8 @@ public final class RunnerClassLoader extends ClassLoader {
 
     private void definePackage(String pkgName, ClassLoadingResource[] resources) {
         if ((pkgName != null) && getDefinedPackage(pkgName) == null) {
-            for (ClassLoadingResource classPathElement : resources) {
-                ManifestInfo mf = classPathElement.getManifestInfo();
+            for (int i = 0; i < resources.length; i++) {
+                ManifestInfo mf = resources[i].getManifestInfo();
                 if (mf != null) {
                     try {
                         definePackage(pkgName, mf.getSpecTitle(),
@@ -207,9 +208,11 @@ public final class RunnerClassLoader extends ClassLoader {
             return null;
         }
         ClassLoadingResource[] resources = getClassLoadingResources(name);
-        if (resources == null)
+        if (resources == null) {
             return null;
-        for (ClassLoadingResource resource : resources) {
+        }
+        for (int i = 0; i < resources.length; i++) {
+            ClassLoadingResource resource = resources[i];
             accessingResource(resource);
             URL data = resource.getResourceURL(name);
             if (data != null) {
@@ -261,7 +264,8 @@ public final class RunnerClassLoader extends ClassLoader {
         if (resources == null)
             return Collections.emptyEnumeration();
         List<URL> urls = new ArrayList<>();
-        for (ClassLoadingResource resource : resources) {
+        for (int i = 0; i < resources.length; i++) {
+            ClassLoadingResource resource = resources[i];
             accessingResource(resource);
             URL data = resource.getResourceURL(name);
             if (data != null) {
