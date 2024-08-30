@@ -1,24 +1,14 @@
-[.configuration-legend]
-icon:lock[title=Fixed at build time] Configuration property fixed at build time - All other configuration properties are overridable at runtime
-[.configuration-reference{#if searchable}.searchable{/if}, cols="80,.^10,.^10"]
-|===
+🔒 Configuration property fixed at build time - All other configuration properties are overridable at runtime
 
-h|[.header-title]##Configuration property##
-h|Type
-h|Default
-
+| Configuration property | Type | Default |
+|------------------------|------|---------|
 {#for item in configItemCollection.items}
 {#if !item.deprecated}
 {#if item.isSection}
 {#configSection configSection=item extension=extension additionalAnchorPrefix=additionalAnchorPrefix /}
-
-{#else}
-{#configProperty configProperty=item extension=extension additionalAnchorPrefix=additionalAnchorPrefix /}
-
-{/if}
+{#else}{#configProperty configProperty=item extension=extension additionalAnchorPrefix=additionalAnchorPrefix /}{/if}
 {/if}
 {/for}
-|===
 
 {#if includeDurationNote}
 {#durationNote summaryTableId /}
@@ -26,5 +16,3 @@ h|Default
 {#if includeMemorySizeNote}
 {#memorySizeNote summaryTableId /}
 {/if}
-
-:!summaryTableId:

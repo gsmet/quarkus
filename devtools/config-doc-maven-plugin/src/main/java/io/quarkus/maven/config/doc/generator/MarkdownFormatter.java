@@ -1,14 +1,18 @@
 package io.quarkus.maven.config.doc.generator;
 
 import io.quarkus.annotation.processor.documentation.config.merger.JavadocRepository;
-import io.quarkus.annotation.processor.documentation.config.model.JavadocElements.JavadocElement;
 
 final class MarkdownFormatter extends AbstractFormatter {
 
-    private static final String MORE_INFO_ABOUT_TYPE_FORMAT = "[🛈](%s)";
+    private static final String MORE_INFO_ABOUT_TYPE_FORMAT = "[🛈](#%s)";
 
     MarkdownFormatter(JavadocRepository javadocRepository, boolean enableEnumTooltips) {
         super(javadocRepository, enableEnumTooltips);
+    }
+
+    @Override
+    public String escapeCellContent(String value) {
+        return super.escapeCellContent(value).replaceAll("\n+", " ");
     }
 
     @Override
@@ -25,10 +29,5 @@ final class MarkdownFormatter extends AbstractFormatter {
     protected String tooltip(String value, String javadocDescription) {
         // we don't have tooltip support in Markdown
         return "`" + value + "`";
-    }
-
-    @Override
-    protected String javadoc(JavadocElement javadocElement) {
-        return javadocElement.rawJavadoc();
     }
 }

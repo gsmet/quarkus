@@ -31,12 +31,12 @@ abstract class AbstractFormatter implements Formatter {
             return null;
         }
 
-        String description = javadoc(javadocElement.get());
+        String description = javadocElement.get().description();
         if (description == null || description.isBlank()) {
             return null;
         }
 
-        return description + "\n\n";
+        return description;
     }
 
     @Override
@@ -52,13 +52,13 @@ abstract class AbstractFormatter implements Formatter {
                             return "`" + e.getValue().configValue() + "`";
                         }
 
-                        return tooltip(e.getValue().configValue(), javadoc(javadocElement.get()));
+                        return tooltip(e.getValue().configValue(), javadocElement.get().description());
                     })
                     .collect(Collectors.joining(", "));
         } else {
             typeContent = configProperty.getTypeDescription();
             if (configProperty.getJavadocSiteLink() != null) {
-                typeContent = String.format("link:%s[%s]", configProperty.getJavadocSiteLink(), typeContent);
+                typeContent = link(configProperty.getJavadocSiteLink(), typeContent);
             }
         }
         if (configProperty.isList()) {
@@ -201,8 +201,6 @@ abstract class AbstractFormatter implements Formatter {
 
         return extension.name();
     }
-
-    protected abstract String javadoc(JavadocElement javadocElement);
 
     protected abstract String moreInformationAboutType(String anchorRoot, String type);
 
