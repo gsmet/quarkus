@@ -108,33 +108,31 @@ public final class RunnerClassLoader extends ClassLoader {
                 if (data == null) {
                     continue;
                 }
-                definePackage(packageName, resources);
+                definePackage(packageName, resource);
                 return defineClass(name, data, resource);
             }
         }
         return getParent().loadClass(name);
     }
 
-    private void definePackage(String pkgName, ClassLoadingResource[] resources) {
+    private void definePackage(String pkgName, ClassLoadingResource resource) {
         if ((pkgName != null) && getDefinedPackage(pkgName) == null) {
-            for (int i = 0; i < resources.length; i++) {
-                ManifestInfo mf = resources[i].getManifestInfo();
-                if (mf != null) {
-                    try {
-                        definePackage(pkgName, mf.getSpecTitle(),
-                                mf.getSpecVersion(),
-                                mf.getSpecVendor(),
-                                mf.getImplTitle(),
-                                mf.getImplVersion(),
-                                mf.getImplVendor(), null);
-                    } catch (IllegalArgumentException e) {
-                        var loaded = getDefinedPackage(pkgName);
-                        if (loaded == null) {
-                            throw e;
-                        }
+            ManifestInfo mf = resource.getManifestInfo();
+            if (mf != null) {
+                try {
+                    definePackage(pkgName, mf.getSpecTitle(),
+                            mf.getSpecVersion(),
+                            mf.getSpecVendor(),
+                            mf.getImplTitle(),
+                            mf.getImplVersion(),
+                            mf.getImplVendor(), null);
+                } catch (IllegalArgumentException e) {
+                    var loaded = getDefinedPackage(pkgName);
+                    if (loaded == null) {
+                        throw e;
                     }
-                    return;
                 }
+                return;
             }
             try {
                 definePackage(pkgName, null, null, null, null, null, null, null);
