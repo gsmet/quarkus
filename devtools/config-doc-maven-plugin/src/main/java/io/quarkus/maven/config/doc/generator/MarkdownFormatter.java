@@ -20,7 +20,8 @@ final class MarkdownFormatter extends AbstractFormatter {
 
     @Override
     public String escapeCellContent(String value) {
-        return super.escapeCellContent(value).replaceAll("\n+", " ");
+        String cellContent = super.escapeCellContent(value);
+        return cellContent == null ? null : cellContent.replaceAll("\n+", " ");
     }
 
     @Override

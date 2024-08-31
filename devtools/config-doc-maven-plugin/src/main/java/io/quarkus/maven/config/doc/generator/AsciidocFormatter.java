@@ -14,7 +14,8 @@ final class AsciidocFormatter extends AbstractFormatter {
 
     @Override
     public String formatDescription(ConfigProperty configProperty) {
-        return super.formatDescription(configProperty) + "\n\n";
+        String description = super.formatDescription(configProperty);
+        return description == null ? null : description + "\n\n";
     }
 
     protected String moreInformationAboutType(String anchorRoot, String type) {
