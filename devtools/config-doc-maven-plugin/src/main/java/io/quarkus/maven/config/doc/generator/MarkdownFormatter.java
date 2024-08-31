@@ -1,6 +1,7 @@
 package io.quarkus.maven.config.doc.generator;
 
 import io.quarkus.annotation.processor.documentation.config.merger.JavadocRepository;
+import io.quarkus.annotation.processor.documentation.config.model.ConfigSection;
 
 final class MarkdownFormatter extends AbstractFormatter {
 
@@ -8,6 +9,13 @@ final class MarkdownFormatter extends AbstractFormatter {
 
     MarkdownFormatter(JavadocRepository javadocRepository, boolean enableEnumTooltips) {
         super(javadocRepository, enableEnumTooltips);
+    }
+
+    @Override
+    public String formatSectionTitle(ConfigSection configSection) {
+        // markdown only has 6 heading levels
+        int headingLevel = Math.min(6, 2 + configSection.getLevel());
+        return "#".repeat(headingLevel) + " " + super.formatSectionTitle(configSection);
     }
 
     @Override

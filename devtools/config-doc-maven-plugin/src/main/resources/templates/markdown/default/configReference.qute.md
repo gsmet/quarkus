@@ -1,12 +1,14 @@
-🔒 Configuration property fixed at build time - All other configuration properties are overridable at runtime
+🔒: Configuration property fixed at build time - All other configuration properties are overridable at runtime
 
 | Configuration property | Type | Default |
 |------------------------|------|---------|
 {#for item in configItemCollection.items}
 {#if !item.deprecated}
-{#if item.isSection}
+{#if !item.isSection}
+{#configProperty configProperty=item extension=extension additionalAnchorPrefix=additionalAnchorPrefix /}
+{#else}
 {#configSection configSection=item extension=extension additionalAnchorPrefix=additionalAnchorPrefix /}
-{#else}{#configProperty configProperty=item extension=extension additionalAnchorPrefix=additionalAnchorPrefix /}{/if}
+{/if}
 {/if}
 {/for}
 

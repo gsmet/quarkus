@@ -1,10 +1,13 @@
-| <a name="{configSection.toAnchor(extension, additionalAnchorPrefix)}"></a>[**{configSection.formatTitle.escapeCellContent}**](#{configSection.toAnchor(extension, additionalAnchorPrefix)}) | | |
+{configSection.formatTitle}
+
+| Configuration property | Type | Default |
+|------------------------|------|---------|
 {#for item in configSection.items}
 {#if !item.deprecated}
-{#if item.isSection}
-{#configSection configSection=item extension=extension additionalAnchorPrefix=additionalAnchorPrefix /}
-{#else}
+{#if !item.isSection}
 {#configProperty configProperty=item extension=extension additionalAnchorPrefix=additionalAnchorPrefix /}
+{#else}
+{#configSection configSection=item extension=extension additionalAnchorPrefix=additionalAnchorPrefix /}
 {/if}
 {/if}
 {/for}
