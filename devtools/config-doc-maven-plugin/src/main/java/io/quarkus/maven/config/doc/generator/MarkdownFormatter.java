@@ -2,6 +2,7 @@ package io.quarkus.maven.config.doc.generator;
 
 import io.quarkus.annotation.processor.documentation.config.merger.JavadocRepository;
 import io.quarkus.annotation.processor.documentation.config.model.ConfigSection;
+import io.quarkus.annotation.processor.documentation.config.model.JavadocElements;
 
 final class MarkdownFormatter extends AbstractFormatter {
 
@@ -38,5 +39,10 @@ final class MarkdownFormatter extends AbstractFormatter {
     protected String tooltip(String value, String javadocDescription) {
         // we don't have tooltip support in Markdown
         return "`" + value + "`";
+    }
+
+    @Override
+    protected String javadoc(JavadocElements.JavadocElement javadocElement) {
+        return javadocElement.rawJavadoc();
     }
 }
