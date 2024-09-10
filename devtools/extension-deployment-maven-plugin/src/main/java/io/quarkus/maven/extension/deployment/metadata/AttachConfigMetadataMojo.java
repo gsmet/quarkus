@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.execution.MavenSession;
@@ -24,6 +25,7 @@ import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.MavenProjectHelper;
 
+import io.quarkus.annotation.processor.documentation.config.formatter.JavadocTransformer;
 import io.quarkus.annotation.processor.documentation.config.merger.JavadocMerger;
 import io.quarkus.annotation.processor.documentation.config.merger.JavadocRepository;
 import io.quarkus.annotation.processor.documentation.config.merger.MergedModel;
@@ -37,7 +39,8 @@ import io.quarkus.annotation.processor.documentation.config.model.ConfigRoot;
 import io.quarkus.annotation.processor.documentation.config.model.Extension;
 import io.quarkus.annotation.processor.documentation.config.model.Extension.NameSource;
 import io.quarkus.annotation.processor.documentation.config.model.JavadocElements.JavadocElement;
-import io.quarkus.annotation.processor.documentation.config.model.SourceType;
+import io.quarkus.annotation.processor.documentation.config.model.JavadocFormat;
+import io.quarkus.annotation.processor.documentation.config.model.SourceElementType;
 import io.quarkus.annotation.processor.documentation.config.util.JacksonMappers;
 import io.quarkus.maven.extension.deployment.metadata.model.spring.QuarkusConfigAdditionalMetadataProperty;
 import io.quarkus.maven.extension.deployment.metadata.model.spring.QuarkusConfigAdditionalMetadataProperty.ConfigPhase;
@@ -136,27 +139,29 @@ public class AttachConfigMetadataMojo extends AbstractMojo {
                                         configProperty.getDeprecation().since())
                                 : null;
 
-                        // TODO: be careful, this is asciidoc, we will discuss this further with the IDE teams
-                        String description = javadocRepository
-                                .getElement(configProperty.getSourceClass(), configProperty.getSourceName())
-                                .map(JavadocElement::description).orElse(null);
+                        String description = getJavadoc(javadocRepository, configProperty.getSourceType(),
+                                configProperty.getSourceElementName());
+
                         List<SpringConfigMetadataHintValue> hintValues = List.of();
 
                         ConfigPhase phase = ConfigPhase.of(configProperty.getPhase());
 
                         properties.add(new SpringConfigMetadataProperty(configProperty.getPath().property(),
                                 configProperty.getType(), description,
-                                configProperty.getSourceClass(),
-                                configProperty.getSourceType() == SourceType.FIELD ? configProperty.getSourceName() : null,
-                                configProperty.getSourceType() == SourceType.METHOD ? configProperty.getSourceName() : null,
+                                configProperty.getSourceType(),
+                                configProperty.getSourceElementType() == SourceElementType.FIELD
+                                        ? configProperty.getSourceElementName()
+                                        : null,
+                                configProperty.getSourceElementType() == SourceElementType.METHOD
+                                        ? configProperty.getSourceElementName()
+                                        : null,
                                 configProperty.getDefaultValue(),
                                 deprecation, new QuarkusConfigAdditionalMetadataProperty(phase,
                                         configProperty.getPath().environmentVariable(), configProperty.isOptional())));
                         if (configProperty.isEnum()) {
                             hintValues = configProperty.getEnumAcceptedValues().values().entrySet().stream()
                                     .map(e -> new SpringConfigMetadataHintValue(e.getValue().configValue(),
-                                            javadocRepository.getElement(configProperty.getType(), e.getKey())
-                                                    .map(JavadocElement::description).orElse(null)))
+                                            getJavadoc(javadocRepository, configProperty.getType(), e.getKey())))
                                     .toList();
                             hints.add(new SpringConfigMetadataHint(configProperty.getPath().property(), hintValues));
                         }
@@ -164,12 +169,12 @@ public class AttachConfigMetadataMojo extends AbstractMojo {
                         for (PropertyPath additionalPath : configProperty.getAdditionalPaths()) {
                             properties.add(
                                     new SpringConfigMetadataProperty(additionalPath.property(), configProperty.getType(),
-                                            description, configProperty.getSourceClass(),
-                                            configProperty.getSourceType() == SourceType.FIELD
-                                                    ? configProperty.getSourceName()
+                                            description, configProperty.getSourceType(),
+                                            configProperty.getSourceElementType() == SourceElementType.FIELD
+                                                    ? configProperty.getSourceElementName()
                                                     : null,
-                                            configProperty.getSourceType() == SourceType.METHOD
-                                                    ? configProperty.getSourceName()
+                                            configProperty.getSourceElementType() == SourceElementType.METHOD
+                                                    ? configProperty.getSourceElementName()
                                                     : null,
                                             configProperty.getDefaultValue(),
                                             deprecation, new QuarkusConfigAdditionalMetadataProperty(phase,
@@ -219,5 +224,16 @@ public class AttachConfigMetadataMojo extends AbstractMojo {
                 project.getArtifactId().substring(0, project.getArtifactId().length() - DEPLOYMENT_ARTIFACT_SUFFIX.length()),
                 null,
                 NameSource.NONE, true);
+    }
+
+    private String getJavadoc(JavadocRepository javadocRepository, String sourceType, String sourceElementName) {
+        Optional<JavadocElement> javadocElement = javadocRepository
+                .getElement(sourceType, sourceElementName);
+        if (javadocElement.isEmpty()) {
+            return null;
+        }
+
+        return JavadocTransformer.transform(javadocElement.get().description(),
+                javadocElement.get().format(), JavadocFormat.MARKDOWN);
     }
 }
