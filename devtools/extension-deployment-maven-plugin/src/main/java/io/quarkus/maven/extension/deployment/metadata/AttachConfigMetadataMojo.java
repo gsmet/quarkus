@@ -222,8 +222,7 @@ public class AttachConfigMetadataMojo extends AbstractMojo {
     private Extension getExtension() {
         return new Extension(project.getGroupId(),
                 project.getArtifactId().substring(0, project.getArtifactId().length() - DEPLOYMENT_ARTIFACT_SUFFIX.length()),
-                null,
-                NameSource.NONE, true);
+                null, NameSource.NONE, false, true);
     }
 
     private String getJavadoc(JavadocRepository javadocRepository, String sourceType, String sourceElementName) {
