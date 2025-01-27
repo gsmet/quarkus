@@ -610,7 +610,7 @@ public class QuarkusComponentTestExtension
                         switch (resource.getType()) {
                             case JAVA_CLASS:
                                 classes.put(resource.getName() + ".class", resource.getData());
-                                ((QuarkusClassLoader) testClass.getClassLoader()).reset(classes, Map.of());
+                                ((QuarkusClassLoader) testClass.getClassLoader()).contributeGeneratedResources(classes);
                                 break;
                             case SERVICE_PROVIDER:
                                 if (resource.getName()

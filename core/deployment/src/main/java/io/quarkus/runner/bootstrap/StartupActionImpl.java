@@ -29,16 +29,20 @@ import io.quarkus.bootstrap.app.QuarkusBootstrap;
 import io.quarkus.bootstrap.app.RunningQuarkusApplication;
 import io.quarkus.bootstrap.app.StartupAction;
 import io.quarkus.bootstrap.classloading.QuarkusClassLoader;
+import io.quarkus.bootstrap.model.RemovedClass;
 import io.quarkus.builder.BuildResult;
 import io.quarkus.deployment.builditem.ApplicationClassNameBuildItem;
 import io.quarkus.deployment.builditem.DevServicesLauncherConfigResultBuildItem;
 import io.quarkus.deployment.builditem.GeneratedClassBuildItem;
 import io.quarkus.deployment.builditem.GeneratedResourceBuildItem;
 import io.quarkus.deployment.builditem.MainClassBuildItem;
+import io.quarkus.deployment.builditem.RemovedClassesBuildItem;
+import io.quarkus.deployment.builditem.RemovedResourcesBuildItem;
 import io.quarkus.deployment.builditem.RuntimeApplicationShutdownBuildItem;
 import io.quarkus.deployment.builditem.TransformedClassesBuildItem;
 import io.quarkus.deployment.configuration.RunTimeConfigurationGenerator;
 import io.quarkus.dev.appstate.ApplicationStateNotification;
+import io.quarkus.maven.dependency.ArtifactKey;
 import io.quarkus.runtime.ApplicationLifecycleManager;
 import io.quarkus.runtime.Quarkus;
 import io.quarkus.runtime.configuration.RuntimeOverrideConfigSource;
@@ -65,7 +69,12 @@ public class StartupActionImpl implements StartupAction {
         this.runtimeApplicationShutdownBuildItems = buildResult.consumeMulti(RuntimeApplicationShutdownBuildItem.class);
 
         Map<String, byte[]> transformedClasses = extractTransformedClasses(buildResult);
-        QuarkusClassLoader baseClassLoader = curatedApplication.getOrCreateBaseRuntimeClassLoader();
+        Map<ArtifactKey, List<RemovedClass>> removedClasses = buildResult.consume(RemovedClassesBuildItem.class)
+                .getRemovedClasses();
+        Map<ArtifactKey, Set<String>> removedResources = buildResult.consume(RemovedResourcesBuildItem.class)
+                .getRemovedResources();
+
+        QuarkusClassLoader baseRuntimeClassLoader = curatedApplication.getOrCreateBaseRuntimeClassLoader();
         QuarkusClassLoader runtimeClassLoader;
 
         //so we have some differences between dev and test mode here.
@@ -74,13 +83,13 @@ public class StartupActionImpl implements StartupAction {
         Map<String, byte[]> resources = new HashMap<>(extractGeneratedResources(buildResult, true));
         if (curatedApplication.isFlatClassPath()) {
             resources.putAll(extractGeneratedResources(buildResult, false));
-            baseClassLoader.reset(resources, transformedClasses);
-            runtimeClassLoader = baseClassLoader;
+            baseRuntimeClassLoader.reset(resources, transformedClasses, removedClasses, removedResources);
+            runtimeClassLoader = baseRuntimeClassLoader;
         } else {
-            baseClassLoader.reset(extractGeneratedResources(buildResult, false),
-                    transformedClasses);
-            runtimeClassLoader = curatedApplication.createRuntimeClassLoader(
-                    resources, transformedClasses);
+            baseRuntimeClassLoader.reset(extractGeneratedResources(buildResult, false),
+                    transformedClasses, removedClasses, removedResources);
+            runtimeClassLoader = curatedApplication.createRuntimeClassLoader(baseRuntimeClassLoader, resources,
+                    transformedClasses, removedClasses, removedResources);
         }
         this.runtimeClassLoader = runtimeClassLoader;
     }

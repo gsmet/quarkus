@@ -1,7 +1,6 @@
 package io.quarkus.deployment.pkg.steps;
 
 import static io.quarkus.commons.classloading.ClassLoaderHelper.fromClassNameToResourceName;
-import static io.quarkus.deployment.pkg.PackageConfig.JarConfig.JarType.LEGACY_JAR;
 import static io.quarkus.deployment.pkg.PackageConfig.JarConfig.JarType.MUTABLE_JAR;
 import static io.quarkus.deployment.pkg.PackageConfig.JarConfig.JarType.UBER_JAR;
 
@@ -39,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.BiPredicate;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
@@ -54,6 +54,7 @@ import java.util.stream.Stream;
 import org.jboss.logging.Logger;
 
 import io.quarkus.bootstrap.model.MutableJarApplicationModel;
+import io.quarkus.bootstrap.model.RemovedClass;
 import io.quarkus.bootstrap.runner.QuarkusEntryPoint;
 import io.quarkus.bootstrap.runner.SerializedApplication;
 import io.quarkus.bootstrap.util.IoUtils;
@@ -67,6 +68,8 @@ import io.quarkus.deployment.builditem.GeneratedNativeImageClassBuildItem;
 import io.quarkus.deployment.builditem.GeneratedResourceBuildItem;
 import io.quarkus.deployment.builditem.MainClassBuildItem;
 import io.quarkus.deployment.builditem.QuarkusBuildCloseablesBuildItem;
+import io.quarkus.deployment.builditem.RemovedClassesBuildItem;
+import io.quarkus.deployment.builditem.RemovedResourcesBuildItem;
 import io.quarkus.deployment.builditem.TransformedClassesBuildItem;
 import io.quarkus.deployment.configuration.ClassLoadingConfig;
 import io.quarkus.deployment.pkg.PackageConfig;
@@ -189,6 +192,8 @@ public class JarResultBuildStep {
     public JarBuildItem buildRunnerJar(CurateOutcomeBuildItem curateOutcomeBuildItem,
             OutputTargetBuildItem outputTargetBuildItem,
             TransformedClassesBuildItem transformedClasses,
+            RemovedClassesBuildItem removedClasses,
+            RemovedResourcesBuildItem removedResources,
             ApplicationArchivesBuildItem applicationArchivesBuildItem,
             ApplicationInfoBuildItem applicationInfo,
             PackageConfig packageConfig,
@@ -206,19 +211,18 @@ public class JarResultBuildStep {
         }
 
         return switch (packageConfig.jar().type()) {
-            case UBER_JAR ->
-                buildUberJar(curateOutcomeBuildItem, outputTargetBuildItem, transformedClasses, applicationArchivesBuildItem,
-                        packageConfig, applicationInfo, generatedClasses, generatedResources, uberJarMergedResourceBuildItems,
-                        uberJarIgnoredResourceBuildItems, mainClassBuildItem, classLoadingConfig);
+            case UBER_JAR -> buildUberJar(curateOutcomeBuildItem, outputTargetBuildItem, transformedClasses, removedClasses,
+                    removedResources, applicationArchivesBuildItem, packageConfig, applicationInfo, generatedClasses,
+                    generatedResources, uberJarMergedResourceBuildItems, uberJarIgnoredResourceBuildItems, mainClassBuildItem,
+                    classLoadingConfig);
             case LEGACY_JAR -> buildLegacyThinJar(curateOutcomeBuildItem, outputTargetBuildItem, transformedClasses,
-                    applicationArchivesBuildItem,
+                    removedClasses, removedResources, applicationArchivesBuildItem,
                     packageConfig, applicationInfo, generatedClasses, generatedResources, mainClassBuildItem,
                     classLoadingConfig);
-            case FAST_JAR, MUTABLE_JAR ->
-                buildThinJar(curateOutcomeBuildItem, outputTargetBuildItem, transformedClasses, applicationArchivesBuildItem,
-                        packageConfig, classLoadingConfig, applicationInfo, generatedClasses,
-                        generatedResources,
-                        additionalApplicationArchiveBuildItems, mainClassBuildItem);
+            case FAST_JAR, MUTABLE_JAR -> buildThinJar(curateOutcomeBuildItem, outputTargetBuildItem, transformedClasses,
+                    removedClasses, removedResources, applicationArchivesBuildItem, packageConfig, classLoadingConfig,
+                    applicationInfo, generatedClasses, generatedResources,
+                    additionalApplicationArchiveBuildItems, mainClassBuildItem);
         };
     }
 
@@ -253,6 +257,8 @@ public class JarResultBuildStep {
     private JarBuildItem buildUberJar(CurateOutcomeBuildItem curateOutcomeBuildItem,
             OutputTargetBuildItem outputTargetBuildItem,
             TransformedClassesBuildItem transformedClasses,
+            RemovedClassesBuildItem removedClasses,
+            RemovedResourcesBuildItem removedResources,
             ApplicationArchivesBuildItem applicationArchivesBuildItem,
             PackageConfig packageConfig,
             ApplicationInfoBuildItem applicationInfo,
@@ -282,6 +288,8 @@ public class JarResultBuildStep {
         buildUberJar0(curateOutcomeBuildItem,
                 outputTargetBuildItem,
                 transformedClasses,
+                removedClasses,
+                removedResources,
                 applicationArchivesBuildItem,
                 packageConfig,
                 applicationInfo,
@@ -338,6 +346,8 @@ public class JarResultBuildStep {
     private void buildUberJar0(CurateOutcomeBuildItem curateOutcomeBuildItem,
             OutputTargetBuildItem outputTargetBuildItem,
             TransformedClassesBuildItem transformedClasses,
+            RemovedClassesBuildItem removedClasses,
+            RemovedResourcesBuildItem removedResources,
             ApplicationArchivesBuildItem applicationArchivesBuildItem,
             PackageConfig packageConfig,
             ApplicationInfoBuildItem applicationInfo,
@@ -390,10 +400,12 @@ public class JarResultBuildStep {
 
                 for (Path resolvedDep : appDep.getResolvedPaths()) {
                     Set<String> existingEntries = new HashSet<>();
-                    Set<String> transformedFilesByJar = transformedClasses.getTransformedFilesByJar().get(resolvedDep);
-                    if (transformedFilesByJar != null) {
-                        existingEntries.addAll(transformedFilesByJar);
-                    }
+                    Set<String> transformedFilesByJar = transformedClasses.getTransformedFilesByJar().getOrDefault(resolvedDep,
+                            Set.of());
+                    List<RemovedClass> removedClassesByJar = removedClasses.getRemovedClasses(appDep.getKey());
+                    Set<String> removedResourcesByJar = removedResources.getRemovedResources(appDep.getKey());
+
+                    existingEntries.addAll(transformedFilesByJar);
                     generatedResources.stream()
                             .map(GeneratedResourceBuildItem::getName)
                             .forEach(existingEntries::add);
@@ -402,13 +414,14 @@ public class JarResultBuildStep {
                         try (FileSystem artifactFs = ZipUtils.newFileSystem(resolvedDep)) {
                             for (final Path root : artifactFs.getRootDirectories()) {
                                 walkFileDependencyForDependency(root, runnerZipFs, seen, duplicateCatcher, concatenatedEntries,
-                                        allIgnoredEntriesPredicate, appDep, existingEntries, mergeResourcePaths);
+                                        allIgnoredEntriesPredicate, appDep, existingEntries, mergeResourcePaths,
+                                        transformedFilesByJar, removedClassesByJar, removedResourcesByJar);
                             }
                         }
                     } else {
                         walkFileDependencyForDependency(resolvedDep, runnerZipFs, seen, duplicateCatcher,
                                 concatenatedEntries, allIgnoredEntriesPredicate, appDep, existingEntries,
-                                mergeResourcePaths);
+                                mergeResourcePaths, transformedFilesByJar, removedClassesByJar, removedResourcesByJar);
                     }
                 }
             }
@@ -422,8 +435,7 @@ public class JarResultBuildStep {
                 }
             }
             copyCommonContent(runnerZipFs, concatenatedEntries, applicationArchivesBuildItem, transformedClasses,
-                    generatedClasses,
-                    generatedResources, seen, allIgnoredEntriesPredicate);
+                    generatedClasses, generatedResources, seen, allIgnoredEntriesPredicate);
             // now that all entries have been added, check if there's a META-INF/versions/ entry. If present,
             // mark this jar as multi-release jar. Strictly speaking, the jar spec expects META-INF/versions/N
             // directory where N is an integer greater than 8, but we don't do that level of checks here but that
@@ -479,7 +491,8 @@ public class JarResultBuildStep {
     private void walkFileDependencyForDependency(Path root, FileSystem runnerZipFs, Map<String, String> seen,
             Map<String, Set<Dependency>> duplicateCatcher, Map<String, List<byte[]>> concatenatedEntries,
             Predicate<String> ignoredEntriesPredicate, Dependency appDep, Set<String> existingEntries,
-            Set<String> mergeResourcePaths) throws IOException {
+            Set<String> mergeResourcePaths, Set<String> transformedClasses, List<RemovedClass> removedClasses,
+            Set<String> removedResources) throws IOException {
         final Path metaInfDir = root.resolve("META-INF");
         Files.walkFileTree(root, EnumSet.of(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE,
                 new SimpleFileVisitor<Path>() {
@@ -508,6 +521,9 @@ public class JarResultBuildStep {
                             }
                             return FileVisitResult.CONTINUE;
                         }
+                        if (isRemovedElement(relativePath, transformedClasses, removedClasses, removedResources)) {
+                            return FileVisitResult.CONTINUE;
+                        }
                         if (!existingEntries.contains(relativePath)) {
                             if (UBER_JAR_CONCATENATED_ENTRIES_PREDICATE.test(relativePath)
                                     || mergeResourcePaths.contains(relativePath)) {
@@ -533,6 +549,8 @@ public class JarResultBuildStep {
     private JarBuildItem buildLegacyThinJar(CurateOutcomeBuildItem curateOutcomeBuildItem,
             OutputTargetBuildItem outputTargetBuildItem,
             TransformedClassesBuildItem transformedClasses,
+            RemovedClassesBuildItem removedClasses,
+            RemovedResourcesBuildItem removedResources,
             ApplicationArchivesBuildItem applicationArchivesBuildItem,
             PackageConfig packageConfig,
             ApplicationInfoBuildItem applicationInfo,
@@ -551,8 +569,8 @@ public class JarResultBuildStep {
 
             log.info("Building thin jar: " + runnerJar);
 
-            doLegacyThinJarGeneration(curateOutcomeBuildItem, outputTargetBuildItem, transformedClasses,
-                    applicationArchivesBuildItem, applicationInfo,
+            doLegacyThinJarGeneration(curateOutcomeBuildItem, outputTargetBuildItem, transformedClasses, removedClasses,
+                    removedResources, applicationArchivesBuildItem, applicationInfo,
                     packageConfig, generatedResources, libDir, generatedClasses, runnerZipFs, mainClassBuildItem,
                     classLoadingConfig);
         }
@@ -566,6 +584,8 @@ public class JarResultBuildStep {
     private JarBuildItem buildThinJar(CurateOutcomeBuildItem curateOutcomeBuildItem,
             OutputTargetBuildItem outputTargetBuildItem,
             TransformedClassesBuildItem transformedClasses,
+            RemovedClassesBuildItem removedClasses,
+            RemovedResourcesBuildItem removedResources,
             ApplicationArchivesBuildItem applicationArchivesBuildItem,
             PackageConfig packageConfig,
             ClassLoadingConfig classLoadingConfig,
@@ -713,7 +733,8 @@ public class JarResultBuildStep {
             if (!rebuild) {
                 copyDependency(parentFirstKeys, outputTargetBuildItem, copiedArtifacts, mainLib, baseLib,
                         fastJarJarsBuilder::addDep, true,
-                        classPath, appDep, transformedClasses, removed, packageConfig, manifestConfig);
+                        classPath, appDep, transformedClasses, removedClasses, removedResources, removed,
+                        packageConfig, manifestConfig);
             } else if (includeAppDep(appDep, outputTargetBuildItem.getIncludedOptionalDependencies(), removed)) {
                 appDep.getResolvedPaths().forEach(fastJarJarsBuilder::addDep);
             }
@@ -803,9 +824,11 @@ public class JarResultBuildStep {
                 Path deploymentLib = libDir.resolve(DEPLOYMENT_LIB);
                 Files.createDirectories(deploymentLib);
                 for (ResolvedDependency appDep : curateOutcomeBuildItem.getApplicationModel().getDependencies()) {
+                    // we don't care about transformed and removed classes here, so just pass in empty items
                     copyDependency(parentFirstKeys, outputTargetBuildItem, copiedArtifacts, deploymentLib, baseLib, p -> {
-                    }, false, classPath, appDep, new TransformedClassesBuildItem(Map.of()), removed, packageConfig,
-                            manifestConfig); //we don't care about transformation here, so just pass in an empty item
+                    }, false, classPath, appDep, new TransformedClassesBuildItem(Map.of()),
+                            new RemovedClassesBuildItem(Map.of()), new RemovedResourcesBuildItem(Map.of()),
+                            removed, packageConfig, manifestConfig);
                 }
                 Map<ArtifactKey, List<String>> relativePaths = new HashMap<>();
                 for (Map.Entry<ArtifactKey, List<Path>> e : copiedArtifacts.entrySet()) {
@@ -908,7 +931,8 @@ public class JarResultBuildStep {
     private void copyDependency(Set<ArtifactKey> parentFirstArtifacts, OutputTargetBuildItem outputTargetBuildItem,
             Map<ArtifactKey, List<Path>> runtimeArtifacts, Path libDir, Path baseLib, Consumer<Path> targetPathConsumer,
             boolean allowParentFirst, StringBuilder classPath, ResolvedDependency appDep,
-            TransformedClassesBuildItem transformedClasses, Set<ArtifactKey> removedDeps,
+            TransformedClassesBuildItem transformedClasses, RemovedClassesBuildItem removedClasses,
+            RemovedResourcesBuildItem removedResources, Set<ArtifactKey> removedDeps,
             PackageConfig packageConfig, ApplicationManifestConfig.Builder manifestConfig)
             throws IOException {
 
@@ -933,47 +957,43 @@ public class JarResultBuildStep {
             }
             runtimeArtifacts.computeIfAbsent(appDep.getKey(), (s) -> new ArrayList<>(1)).add(targetPath);
 
+            Set<String> transformedClassesFromThisArchive = transformedClasses.getTransformedFilesByJar()
+                    .getOrDefault(resolvedDep, Set.of());
+            List<RemovedClass> removedClassesFromThisArchive = removedClasses.getRemovedClasses(appDep.getKey());
+            Set<String> removedResourcesFromThisArchive = removedResources.getRemovedResources(appDep.getKey());
+
             if (Files.isDirectory(resolvedDep)) {
                 // This case can happen when we are building a jar from inside the Quarkus repository
                 // and Quarkus Bootstrap's localProjectDiscovery has been set to true. In such a case
                 // the non-jar dependencies are the Quarkus dependencies picked up on the file system
-                packageClasses(resolvedDep, targetPath, packageConfig);
+                packageClasses(resolvedDep, targetPath, packageConfig, transformedClassesFromThisArchive,
+                        removedClassesFromThisArchive, removedResourcesFromThisArchive);
             } else {
-                Set<TransformedClassesBuildItem.TransformedClass> transformedFromThisArchive = transformedClasses
-                        .getTransformedClassesByJar().get(resolvedDep);
-                Set<String> removedFromThisArchive = new HashSet<>();
-                if (transformedFromThisArchive != null) {
-                    for (TransformedClassesBuildItem.TransformedClass i : transformedFromThisArchive) {
-                        if (i.getData() == null) {
-                            removedFromThisArchive.add(i.getFileName());
-                        }
-                    }
-                }
                 var appComponent = ApplicationComponent.builder()
                         .setPath(targetPath)
                         .setResolvedDependency(appDep);
-                if (removedFromThisArchive.isEmpty()) {
+                if (transformedClassesFromThisArchive.isEmpty() && removedClassesFromThisArchive.isEmpty()
+                        && removedResourcesFromThisArchive.isEmpty()) {
                     Files.copy(resolvedDep, targetPath, StandardCopyOption.REPLACE_EXISTING,
                             StandardCopyOption.COPY_ATTRIBUTES);
                 } else {
+                    Set<String> collectedRemovedElements = new TreeSet<>();
+
                     // we copy jars for which we remove entries to the same directory
                     // which seems a bit odd to me
-                    filterJarFile(resolvedDep, targetPath, removedFromThisArchive);
+                    filterJarFile(resolvedDep, targetPath, transformedClassesFromThisArchive, removedClassesFromThisArchive,
+                            removedResourcesFromThisArchive, collectedRemovedElements);
 
-                    var list = new ArrayList<>(removedFromThisArchive);
-                    Collections.sort(list);
-                    var sb = new StringBuilder("Removed ").append(list.get(0));
-                    for (int i = 1; i < list.size(); ++i) {
-                        sb.append(",").append(list.get(i));
-                    }
-                    appComponent.setPedigree(sb.toString());
+                    appComponent.setPedigree("Removed " + String.join(",", collectedRemovedElements));
                 }
                 manifestConfig.addComponent(appComponent);
             }
         }
     }
 
-    private void packageClasses(Path resolvedDep, final Path targetPath, PackageConfig packageConfig) throws IOException {
+    private void packageClasses(Path resolvedDep, final Path targetPath, PackageConfig packageConfig,
+            Set<String> transformedClasses, List<RemovedClass> removedClasses, Set<String> removedResources)
+            throws IOException {
         try (FileSystem runnerZipFs = createNewZip(targetPath, packageConfig)) {
             Files.walkFileTree(resolvedDep, EnumSet.of(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE,
                     new SimpleFileVisitor<Path>() {
@@ -981,7 +1001,13 @@ public class JarResultBuildStep {
                         public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
                                 throws IOException {
                             final Path relativePath = resolvedDep.relativize(file);
+                            final String relativeUri = toUri(relativePath);
                             final Path targetPath = runnerZipFs.getPath(relativePath.toString());
+
+                            if (isRemovedElement(relativeUri, transformedClasses, removedClasses, removedResources)) {
+                                return FileVisitResult.CONTINUE;
+                            }
+
                             if (targetPath.getParent() != null) {
                                 Files.createDirectories(targetPath.getParent());
                             }
@@ -999,6 +1025,8 @@ public class JarResultBuildStep {
     public NativeImageSourceJarBuildItem buildNativeImageJar(CurateOutcomeBuildItem curateOutcomeBuildItem,
             OutputTargetBuildItem outputTargetBuildItem,
             TransformedClassesBuildItem transformedClasses,
+            RemovedClassesBuildItem removedClasses,
+            RemovedResourcesBuildItem removedResources,
             ApplicationArchivesBuildItem applicationArchivesBuildItem,
             ApplicationInfoBuildItem applicationInfo,
             PackageConfig packageConfig,
@@ -1016,8 +1044,8 @@ public class JarResultBuildStep {
                 .map((s) -> new GeneratedClassBuildItem(true, s.getName(), s.getClassData()))
                 .collect(Collectors.toList()));
 
-        return buildNativeImageThinJar(curateOutcomeBuildItem, outputTargetBuildItem, transformedClasses,
-                applicationArchivesBuildItem,
+        return buildNativeImageThinJar(curateOutcomeBuildItem, outputTargetBuildItem, transformedClasses, removedClasses,
+                removedResources, applicationArchivesBuildItem,
                 applicationInfo, packageConfig, allClasses, generatedResources, mainClassBuildItem, targetDirectory,
                 classLoadingConfig);
     }
@@ -1025,6 +1053,8 @@ public class JarResultBuildStep {
     private NativeImageSourceJarBuildItem buildNativeImageThinJar(CurateOutcomeBuildItem curateOutcomeBuildItem,
             OutputTargetBuildItem outputTargetBuildItem,
             TransformedClassesBuildItem transformedClasses,
+            RemovedClassesBuildItem removedClasses,
+            RemovedResourcesBuildItem removedResources,
             ApplicationArchivesBuildItem applicationArchivesBuildItem,
             ApplicationInfoBuildItem applicationInfo,
             PackageConfig packageConfig,
@@ -1063,9 +1093,9 @@ public class JarResultBuildStep {
                         + "Make sure you report the issue to the maintainers of the extensions that bring it.");
             }
 
-            doLegacyThinJarGeneration(curateOutcomeBuildItem, outputTargetBuildItem, transformedClasses,
-                    applicationArchivesBuildItem, applicationInfo, packageConfig, generatedResources, libDir, allClasses,
-                    runnerZipFs, mainClassBuildItem, classLoadingConfig);
+            doLegacyThinJarGeneration(curateOutcomeBuildItem, outputTargetBuildItem, transformedClasses, removedClasses,
+                    removedResources, applicationArchivesBuildItem, applicationInfo, packageConfig, generatedResources,
+                    libDir, allClasses, runnerZipFs, mainClassBuildItem, classLoadingConfig);
         }
         runnerJar.toFile().setReadable(true, false);
         return new NativeImageSourceJarBuildItem(runnerJar, libDir);
@@ -1101,6 +1131,8 @@ public class JarResultBuildStep {
     private void doLegacyThinJarGeneration(CurateOutcomeBuildItem curateOutcomeBuildItem,
             OutputTargetBuildItem outputTargetBuildItem,
             TransformedClassesBuildItem transformedClasses,
+            RemovedClassesBuildItem removedClasses,
+            RemovedResourcesBuildItem removedResources,
             ApplicationArchivesBuildItem applicationArchivesBuildItem,
             ApplicationInfoBuildItem applicationInfo,
             PackageConfig packageConfig,
@@ -1121,8 +1153,8 @@ public class JarResultBuildStep {
         Predicate<String> ignoredEntriesPredicate = getThinJarIgnoredEntriesPredicate(packageConfig);
 
         final Set<ArtifactKey> removed = getRemovedKeys(classLoadingConfig);
-        copyLibraryJars(runnerZipFs, outputTargetBuildItem, transformedClasses, libDir, classPath, appDeps, services,
-                ignoredEntriesPredicate, removed);
+        copyLibraryJars(runnerZipFs, outputTargetBuildItem, transformedClasses, removedClasses, removedResources,
+                libDir, classPath, appDeps, services, ignoredEntriesPredicate, removed);
 
         ResolvedDependency appArtifact = curateOutcomeBuildItem.getApplicationModel().getAppArtifact();
         // the manifest needs to be the first entry in the jar, otherwise JarInputStream does not work properly
@@ -1135,7 +1167,8 @@ public class JarResultBuildStep {
     }
 
     private void copyLibraryJars(FileSystem runnerZipFs, OutputTargetBuildItem outputTargetBuildItem,
-            TransformedClassesBuildItem transformedClasses, Path libDir,
+            TransformedClassesBuildItem transformedClasses, RemovedClassesBuildItem removedClasses,
+            RemovedResourcesBuildItem removedResources, Path libDir,
             StringBuilder classPath, Collection<ResolvedDependency> appDeps, Map<String, List<byte[]>> services,
             Predicate<String> ignoredEntriesPredicate, Set<ArtifactKey> removedDependencies) throws IOException {
 
@@ -1148,20 +1181,28 @@ public class JarResultBuildStep {
             }
 
             for (Path resolvedDep : appDep.getResolvedPaths()) {
+                Set<String> transformedFromThisArchive = transformedClasses.getTransformedFilesByJar()
+                        .getOrDefault(resolvedDep, Set.of());
+                List<RemovedClass> removedClassesFromThisArchive = removedClasses.getRemovedClasses(appDep.getKey());
+                Set<String> removedResourcesFromThisArchive = removedResources.getRemovedResources(appDep.getKey());
+                Set<String> collectedRemovedElements = new TreeSet<>();
+
                 if (!Files.isDirectory(resolvedDep)) {
-                    Set<String> transformedFromThisArchive = transformedClasses.getTransformedFilesByJar().get(resolvedDep);
-                    if (transformedFromThisArchive == null || transformedFromThisArchive.isEmpty()) {
+                    if (transformedFromThisArchive.isEmpty() && removedClassesFromThisArchive.isEmpty()
+                            && removedResourcesFromThisArchive.isEmpty()) {
                         final String fileName = appDep.getGroupId() + "." + resolvedDep.getFileName();
                         final Path targetPath = libDir.resolve(fileName);
                         Files.copy(resolvedDep, targetPath, StandardCopyOption.REPLACE_EXISTING);
                         classPath.append(" lib/").append(fileName);
                     } else {
-                        //we have transformed classes, we need to handle them correctly
+                        // the jar needs to be modified as we either transformed classes or removed elements from it
                         final String fileName = "modified-" + appDep.getGroupId() + "."
                                 + resolvedDep.getFileName();
                         final Path targetPath = libDir.resolve(fileName);
                         classPath.append(" lib/").append(fileName);
-                        filterJarFile(resolvedDep, targetPath, transformedFromThisArchive);
+
+                        filterJarFile(resolvedDep, targetPath, transformedFromThisArchive,
+                                removedClassesFromThisArchive, removedResourcesFromThisArchive, collectedRemovedElements);
                     }
                 } else {
                     // This case can happen when we are building a jar from inside the Quarkus repository
@@ -1175,6 +1216,10 @@ public class JarResultBuildStep {
                                     final Path relativePath = resolvedDep.relativize(file);
                                     final String relativeUri = toUri(relativePath);
                                     if (ignoredEntriesPredicate.test(relativeUri)) {
+                                        return FileVisitResult.CONTINUE;
+                                    }
+                                    if (isRemovedElement(relativeUri, transformedFromThisArchive, removedClassesFromThisArchive,
+                                            removedResourcesFromThisArchive, collectedRemovedElements)) {
                                         return FileVisitResult.CONTINUE;
                                     }
                                     if (relativeUri.startsWith("META-INF/services/") && relativeUri.length() > 18) {
@@ -1191,6 +1236,7 @@ public class JarResultBuildStep {
                                 }
                             });
                 }
+                log.warnf("Removed %s from %s", collectedRemovedElements, appDep.getKey());
             }
         }
     }
@@ -1275,7 +1321,8 @@ public class JarResultBuildStep {
         }
     }
 
-    static void filterJarFile(Path resolvedDep, Path targetPath, Set<String> transformedFromThisArchive) {
+    static void filterJarFile(Path resolvedDep, Path targetPath, Set<String> transformedClasses,
+            List<RemovedClass> removedClasses, Set<String> removedResources, Set<String> collectedRemovedElements) {
         try {
             byte[] buffer = new byte[10000];
             try (JarFile in = new JarFile(resolvedDep.toFile(), false)) {
@@ -1297,8 +1344,11 @@ public class JarResultBuildStep {
                     while (entries.hasMoreElements()) {
                         JarEntry entry = entries.nextElement();
                         String entryName = entry.getName();
-                        if (!transformedFromThisArchive.contains(entryName)
-                                && !entryName.equals(JarFile.MANIFEST_NAME)
+                        if (isRemovedElement(entryName, transformedClasses, removedClasses, removedResources,
+                                collectedRemovedElements)) {
+                            continue;
+                        }
+                        if (!entryName.equals(JarFile.MANIFEST_NAME)
                                 && !entryName.equals("META-INF/INDEX.LIST")
                                 && !isSignatureFile(entryName)) {
                             entry.setCompressedSize(-1);
@@ -1714,4 +1764,35 @@ public class JarResultBuildStep {
         return ZipUtils.newZip(runnerJar);
     }
 
+    private static boolean isRemovedElement(String fileName, Set<String> transformedClasses,
+            List<RemovedClass> removedClasses, Set<String> removedResources) {
+        return isRemovedElement(fileName, transformedClasses, removedClasses, removedResources, null);
+    }
+
+    private static boolean isRemovedElement(String fileName, Set<String> transformedClasses,
+            List<RemovedClass> removedClasses, Set<String> removedResources,
+            Set<String> collectedRemovedElements) {
+        if (transformedClasses.contains(fileName)) {
+            if (collectedRemovedElements != null) {
+                collectedRemovedElements.add(fileName);
+            }
+            return true;
+        }
+        if (removedResources.contains(fileName)) {
+            if (collectedRemovedElements != null) {
+                collectedRemovedElements.add(fileName);
+            }
+            return true;
+        }
+        for (RemovedClass removedClass : removedClasses) {
+            if (removedClass.matchesFileName(fileName)) {
+                if (collectedRemovedElements != null) {
+                    collectedRemovedElements.add(fileName);
+                }
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

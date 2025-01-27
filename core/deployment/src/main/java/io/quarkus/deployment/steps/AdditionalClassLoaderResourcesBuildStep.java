@@ -3,7 +3,6 @@ package io.quarkus.deployment.steps;
 import static io.quarkus.commons.classloading.ClassLoaderHelper.fromClassNameToResourceName;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,12 +13,14 @@ import io.quarkus.deployment.annotations.BuildProducer;
 import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.builditem.AdditionalClassLoaderResourcesBuildItem;
 import io.quarkus.deployment.builditem.AdditionalIndexedClassesBuildItem;
+import io.quarkus.deployment.builditem.RemovedClassesBuildItem;
 
 public class AdditionalClassLoaderResourcesBuildStep {
 
     @BuildStep
     void appendAdditionalClassloaderResources(BuildProducer<AdditionalIndexedClassesBuildItem> producer,
-            List<AdditionalClassLoaderResourcesBuildItem> additionalResources) {
+            List<AdditionalClassLoaderResourcesBuildItem> additionalResources,
+            RemovedClassesBuildItem removedClasses) {
 
         if (!additionalResources.isEmpty()) {
             QuarkusClassLoader cl = (QuarkusClassLoader) Thread.currentThread().getContextClassLoader();
@@ -38,7 +39,7 @@ public class AdditionalClassLoaderResourcesBuildStep {
                 }
             }
 
-            cl.reset(collected, Collections.emptyMap());
+            cl.contributeGeneratedResources(collected);
             // produce the AdditionalIndexedClassesBuildItem so this build step
             // is actually invoked and allow to directly index all the classes
             producer.produce(new AdditionalIndexedClassesBuildItem(additionalClassesToIndex.stream().toArray(String[]::new)));

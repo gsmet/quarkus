@@ -683,7 +683,7 @@ public class JunitTestRunner {
                 }
             }
             cl = testApplication.createDeploymentClassLoader();
-            cl.reset(Collections.emptyMap(), transformedClasses);
+            cl.resetTransformedClasses(transformedClasses);
             for (String i : unitTestClasses) {
                 try {
                     utClasses.add(cl.loadClass(i));

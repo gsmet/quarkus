@@ -1,6 +1,6 @@
 package io.quarkus.maven.dependency;
 
-public interface ArtifactKey {
+public interface ArtifactKey extends Comparable<ArtifactKey> {
 
     static ArtifactKey fromString(String s) {
         return GACT.fromString(s);
@@ -70,4 +70,36 @@ public interface ArtifactKey {
         return buf.toString();
     }
 
+    @Override
+    default int compareTo(ArtifactKey o) {
+        if (o == this || this.equals(o)) {
+            return 0;
+        }
+
+        int compare = getGroupId().compareToIgnoreCase(o.getGroupId());
+
+        if (compare != 0) {
+            return compare;
+        }
+
+        compare = getArtifactId().compareToIgnoreCase(o.getArtifactId());
+
+        if (compare != 0) {
+            return compare;
+        }
+
+        compare = getClassifier().compareToIgnoreCase(o.getClassifier());
+
+        if (compare != 0) {
+            return compare;
+        }
+
+        compare = getType().compareToIgnoreCase(o.getType());
+
+        if (compare != 0) {
+            return compare;
+        }
+
+        return 0;
+    }
 }

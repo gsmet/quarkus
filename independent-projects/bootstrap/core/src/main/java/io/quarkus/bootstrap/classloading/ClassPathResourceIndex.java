@@ -10,6 +10,11 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.function.BiConsumer;
 
+import org.jboss.logging.Logger;
+
+import io.quarkus.bootstrap.model.RemovedClass;
+import io.quarkus.maven.dependency.ArtifactKey;
+
 /**
  * We used to have a full index of the resources present in the classpath stored in ClassLoaderState of QuarkusClassLoader.
  * <p>
@@ -43,6 +48,8 @@ import java.util.function.BiConsumer;
  * but it might not be the precise resource we are looking for.
  */
 public class ClassPathResourceIndex {
+
+    private static final Logger LOG = Logger.getLogger(ClassPathResourceIndex.class);
 
     private static final String IO_QUARKUS = "io/quarkus/";
     private static final String META_INF_MAVEN = "META-INF/maven/";
@@ -141,8 +148,9 @@ public class ClassPathResourceIndex {
         return classPathElements;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public static Builder builder(Map<ArtifactKey, List<RemovedClass>> removedClasses,
+            Map<ArtifactKey, Set<String>> removedResources) {
+        return new Builder(removedClasses, removedResources);
     }
 
     /**
@@ -196,6 +204,8 @@ public class ClassPathResourceIndex {
         private static final String CLASS_SUFFIX = ".class";
         private static final ClassPathElement[] EMPTY_CLASSPATH_ELEMENT = new ClassPathElement[0];
 
+        private final Map<ArtifactKey, List<RemovedClass>> removedClasses;
+        private final Map<ArtifactKey, Set<String>> removedResources;
         private final Map<String, ClassPathElement> transformedClassCandidates = new HashMap<>();
         private final Map<String, ClassPathElement> transformedClasses = new HashMap<>();
         private final Map<String, List<ClassPathElement>> resourceMapping = new HashMap<>();
@@ -203,6 +213,12 @@ public class ClassPathResourceIndex {
         private final Set<String> reloadableClasses = new HashSet<>();
         private final Set<String> parentFirstResources = new HashSet<>();
         private final Set<String> bannedResources = new HashSet<>();
+
+        private Builder(Map<ArtifactKey, List<RemovedClass>> removedClasses,
+                Map<ArtifactKey, Set<String>> removedResources) {
+            this.removedClasses = removedClasses;
+            this.removedResources = removedResources;
+        }
 
         public void scanClassPathElement(ClassPathElement classPathElement,
                 BiConsumer<ClassPathElement, String> consumer) {
@@ -216,7 +232,26 @@ public class ClassPathResourceIndex {
         }
 
         public void addResourceMapping(ClassPathElement classPathElement, String resource) {
-            if (classPathElement.containsReloadableResources() && resource.endsWith(CLASS_SUFFIX)) {
+            boolean isClass = resource.endsWith(CLASS_SUFFIX);
+
+            if (classPathElement.getDependencyKey() != null) {
+                if (isClass) {
+                    List<RemovedClass> elementRemovedClasses = removedClasses.getOrDefault(classPathElement.getDependencyKey(),
+                            List.of());
+                    for (int i = 0; i < elementRemovedClasses.size(); i++) {
+                        if (elementRemovedClasses.get(i).matchesFileName(resource)) {
+                            LOG.warnf("Removed %s from %s", resource, classPathElement.getDependencyKey());
+                            return;
+                        }
+                    }
+                }
+                if (removedResources.getOrDefault(classPathElement.getDependencyKey(), Set.of()).contains(resource)) {
+                    LOG.warnf("Removed %s from %s", resource, classPathElement.getDependencyKey());
+                    return;
+                }
+            }
+
+            if (classPathElement.containsReloadableResources() && isClass) {
                 reloadableClasses.add(resource);
             }
 

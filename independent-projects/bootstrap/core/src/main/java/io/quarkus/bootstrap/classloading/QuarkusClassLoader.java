@@ -27,7 +27,9 @@ import java.util.function.Consumer;
 
 import org.jboss.logging.Logger;
 
+import io.quarkus.bootstrap.model.RemovedClass;
 import io.quarkus.commons.classloading.ClassLoaderHelper;
+import io.quarkus.maven.dependency.ArtifactKey;
 import io.quarkus.paths.ManifestAttributes;
 import io.quarkus.paths.PathVisit;
 
@@ -159,6 +161,8 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
      */
     private volatile MemoryClassPathElement resettableElement;
     private volatile MemoryClassPathElement transformedClasses;
+    private volatile Map<ArtifactKey, List<RemovedClass>> removedClasses;
+    private volatile Map<ArtifactKey, Set<String>> removedResources;
     private volatile ClassPathResourceIndex classPathResourceIndex;
     private final List<Runnable> closeTasks = new ArrayList<>();
 
@@ -191,6 +195,8 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
         this.parentFirst = builder.parentFirst;
         this.resettableElement = builder.resettableElement;
         this.transformedClasses = new MemoryClassPathElement(builder.transformedClasses, true);
+        this.removedClasses = builder.removedClasses;
+        this.removedResources = builder.removedResources;
         this.aggregateParentResources = builder.aggregateParentResources;
         this.classLoaderEventListeners = builder.classLoaderEventListeners.isEmpty() ? Collections.emptyList()
                 : builder.classLoaderEventListeners;
@@ -219,7 +225,20 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
         return parentFirst || classPathResourceIndex.isParentFirst(name);
     }
 
-    public void reset(Map<String, byte[]> generatedResources, Map<String, byte[]> transformedClasses) {
+    public void contributeGeneratedResources(Map<String, byte[]> generatedResources) {
+        ensureOpen();
+
+        if (resettableElement == null) {
+            throw new IllegalStateException("Classloader is not resettable");
+        }
+        synchronized (this) {
+            resettableElement.reset(generatedResources);
+            classPathResourceIndex = null;
+        }
+    }
+
+    public void reset(Map<String, byte[]> generatedResources, Map<String, byte[]> transformedClasses,
+            Map<ArtifactKey, List<RemovedClass>> removedClasses, Map<ArtifactKey, Set<String>> removedResources) {
         ensureOpen();
 
         if (resettableElement == null) {
@@ -227,7 +246,18 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
         }
         synchronized (this) {
             this.transformedClasses = new MemoryClassPathElement(transformedClasses, true);
+            this.removedClasses = removedClasses;
+            this.removedResources = removedResources;
             resettableElement.reset(generatedResources);
+            classPathResourceIndex = null;
+        }
+    }
+
+    public void resetTransformedClasses(Map<String, byte[]> transformedClasses) {
+        ensureOpen();
+
+        synchronized (this) {
+            this.transformedClasses = new MemoryClassPathElement(transformedClasses, true);
             classPathResourceIndex = null;
         }
     }
@@ -320,7 +350,8 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
             synchronized (this) {
                 classPathResourceIndex = this.classPathResourceIndex;
                 if (classPathResourceIndex == null) {
-                    ClassPathResourceIndex.Builder classPathResourceIndexBuilder = ClassPathResourceIndex.builder();
+                    ClassPathResourceIndex.Builder classPathResourceIndexBuilder = ClassPathResourceIndex
+                            .builder(removedClasses, removedResources);
 
                     classPathResourceIndexBuilder.scanClassPathElement(transformedClasses,
                             classPathResourceIndexBuilder::addTransformedClassCandidate);
@@ -817,7 +848,9 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
         final List<ClassPathElement> lesserPriorityElements = new ArrayList<>();
         final boolean parentFirst;
         MemoryClassPathElement resettableElement;
-        private Map<String, byte[]> transformedClasses = Collections.emptyMap();
+        private Map<String, byte[]> transformedClasses = Map.of();
+        private Map<ArtifactKey, List<RemovedClass>> removedClasses = Map.of();
+        private Map<ArtifactKey, Set<String>> removedResources = Map.of();
         boolean aggregateParentResources;
         boolean assertionsEnabled;
         private final ArrayList<ClassLoaderEventListener> classLoaderEventListeners = new ArrayList<>(5);
@@ -934,6 +967,16 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
 
         public Builder setTransformedClasses(Map<String, byte[]> transformedClasses) {
             this.transformedClasses = transformedClasses;
+            return this;
+        }
+
+        public Builder setRemovedClasses(Map<ArtifactKey, List<RemovedClass>> removedClasses) {
+            this.removedClasses = removedClasses;
+            return this;
+        }
+
+        public Builder setRemovedResources(Map<ArtifactKey, Set<String>> removedResources) {
+            this.removedResources = removedResources;
             return this;
         }
 

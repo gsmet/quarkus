@@ -16,6 +16,8 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
@@ -58,7 +60,8 @@ class JarResultBuildStepTest {
                 FileOutputStream out = new FileOutputStream(signedJarPath.toFile())) {
             signer.sign(in, out);
         }
-        JarResultBuildStep.filterJarFile(signedJarPath, unsignedJarToTestPath, Set.of("java/lang/Integer.class"));
+        JarResultBuildStep.filterJarFile(signedJarPath, unsignedJarToTestPath, Set.of("java/lang/Integer.class"), List.of(),
+                Set.of(), new HashSet<>());
         try (JarFile jarFile = new JarFile(unsignedJarToTestPath.toFile())) {
             assertThat(jarFile.stream().map(JarEntry::getName)).doesNotContain("META-INF/ECLIPSE_.RSA", "META-INF/ECLIPSE_.SF");
             // Check that the manifest is still present
@@ -76,7 +79,8 @@ class JarResultBuildStepTest {
         Path initialJar = tempDir.resolve("initial.jar");
         Path filteredJar = tempDir.resolve("filtered.jar");
         archive.as(ZipExporter.class).exportTo(new File(initialJar.toUri()), true);
-        JarResultBuildStep.filterJarFile(initialJar, filteredJar, Set.of("java/lang/Integer.class"));
+        JarResultBuildStep.filterJarFile(initialJar, filteredJar, Set.of("java/lang/Integer.class"), List.of(),
+                Set.of(), new HashSet<>());
         try (JarFile jarFile = new JarFile(filteredJar.toFile())) {
             assertThat(jarFile.stream())
                     .filteredOn(jarEntry -> jarEntry.getName().equals(JarFile.MANIFEST_NAME))

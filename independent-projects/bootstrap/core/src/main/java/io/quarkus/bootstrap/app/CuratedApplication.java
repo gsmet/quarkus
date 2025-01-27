@@ -23,6 +23,7 @@ import io.quarkus.bootstrap.classloading.FilteredClassPathElement;
 import io.quarkus.bootstrap.classloading.MemoryClassPathElement;
 import io.quarkus.bootstrap.classloading.QuarkusClassLoader;
 import io.quarkus.bootstrap.model.ApplicationModel;
+import io.quarkus.bootstrap.model.RemovedClass;
 import io.quarkus.maven.dependency.ArtifactKey;
 import io.quarkus.maven.dependency.DependencyFlags;
 import io.quarkus.maven.dependency.ResolvedDependency;
@@ -376,22 +377,23 @@ public class CuratedApplication implements Serializable, AutoCloseable {
         return quarkusBootstrap.getBaseName() != null ? " for " + quarkusBootstrap.getBaseName() : "";
     }
 
-    public QuarkusClassLoader createRuntimeClassLoader(Map<String, byte[]> resources, Map<String, byte[]> transformedClasses) {
-        return createRuntimeClassLoader(getOrCreateBaseRuntimeClassLoader(), resources, transformedClasses);
-    }
-
-    public QuarkusClassLoader createRuntimeClassLoader(ClassLoader base, Map<String, byte[]> resources,
-            Map<String, byte[]> transformedClasses) {
+    public QuarkusClassLoader createRuntimeClassLoader(ClassLoader baseRuntimeClassLoader, Map<String, byte[]> resources,
+            Map<String, byte[]> transformedClasses, Map<ArtifactKey, List<RemovedClass>> removedClasses,
+            Map<ArtifactKey, Set<String>> removedResources) {
         QuarkusClassLoader.Builder builder = QuarkusClassLoader
                 .builder(
                         "Quarkus Runtime ClassLoader: " + quarkusBootstrap.getMode()
                                 + getClassLoaderNameSuffix()
                                 + " restart no:"
                                 + runtimeClassLoaderCount.getAndIncrement(),
-                        getOrCreateBaseRuntimeClassLoader(), false)
+                        baseRuntimeClassLoader, false)
                 .setAssertionsEnabled(quarkusBootstrap.isAssertionsEnabled())
                 .setAggregateParentResources(true);
         builder.setTransformedClasses(transformedClasses);
+        // this shouldn't be necessary as the removed classes and removed resources should live in the base runtime class loader
+        // but let's be safe
+        builder.setRemovedClasses(removedClasses);
+        builder.setRemovedResources(removedResources);
 
         builder.addNormalPriorityElement(new MemoryClassPathElement(resources, true));
         for (Path root : quarkusBootstrap.getApplicationRoot()) {

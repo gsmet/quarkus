@@ -1,12 +1,10 @@
 package io.quarkus.deployment.jbang;
 
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -25,6 +23,8 @@ import io.quarkus.deployment.builditem.GeneratedClassBuildItem;
 import io.quarkus.deployment.builditem.GeneratedResourceBuildItem;
 import io.quarkus.deployment.builditem.LiveReloadBuildItem;
 import io.quarkus.deployment.builditem.MainClassBuildItem;
+import io.quarkus.deployment.builditem.RemovedClassesBuildItem;
+import io.quarkus.deployment.builditem.RemovedResourcesBuildItem;
 import io.quarkus.deployment.builditem.TransformedClassesBuildItem;
 import io.quarkus.deployment.pkg.builditem.ArtifactResultBuildItem;
 import io.quarkus.deployment.pkg.builditem.DeploymentResultBuildItem;
@@ -91,6 +91,7 @@ public class JBangAugmentorImpl implements BiConsumer<CuratedApplication, Map<St
             builder.addFinal(MainClassBuildItem.class);
             builder.addFinal(GeneratedResourceBuildItem.class);
             builder.addFinal(TransformedClassesBuildItem.class);
+            builder.addFinal(RemovedClassesBuildItem.class);
             builder.addFinal(DeploymentResultBuildItem.class);
             // note: quarkus.package.type is deprecated
             boolean nativeRequested = "native".equals(System.getProperty("quarkus.package.type"))
@@ -117,16 +118,11 @@ public class JBangAugmentorImpl implements BiConsumer<CuratedApplication, Map<St
                 for (GeneratedResourceBuildItem i : buildResult.consumeMulti(GeneratedResourceBuildItem.class)) {
                     result.put(i.getName(), i.getData());
                 }
-                for (Map.Entry<Path, Set<TransformedClassesBuildItem.TransformedClass>> entry : buildResult
-                        .consume(TransformedClassesBuildItem.class).getTransformedClassesByJar().entrySet()) {
-                    for (TransformedClassesBuildItem.TransformedClass transformed : entry.getValue()) {
-                        if (transformed.getData() != null) {
-                            result.put(transformed.getFileName(), transformed.getData());
-                        } else {
-                            log.warn("Unable to remove resource " + transformed.getFileName()
-                                    + " as this is not supported in JBangf");
-                        }
-                    }
+                if (!buildResult.consume(RemovedResourcesBuildItem.class).isEmpty()) {
+                    log.warn("Unable to remove resources as this is not supported in JBang");
+                }
+                if (!buildResult.consume(RemovedClassesBuildItem.class).isEmpty()) {
+                    log.warn("Unable to remove classes as this is not supported in JBang");
                 }
                 resultMap.put("files", result);
                 final List<String> javaargs = new ArrayList<>();

@@ -9,7 +9,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -35,25 +34,22 @@ import org.objectweb.asm.ClassWriter;
 import io.quarkus.bootstrap.BootstrapDebug;
 import io.quarkus.bootstrap.classloading.ClassPathElement;
 import io.quarkus.bootstrap.classloading.QuarkusClassLoader;
-import io.quarkus.bootstrap.model.ApplicationModel;
 import io.quarkus.deployment.QuarkusClassVisitor;
 import io.quarkus.deployment.QuarkusClassWriter;
 import io.quarkus.deployment.annotations.BuildStep;
+import io.quarkus.deployment.annotations.Consume;
 import io.quarkus.deployment.builditem.ApplicationArchivesBuildItem;
 import io.quarkus.deployment.builditem.ArchiveRootBuildItem;
 import io.quarkus.deployment.builditem.BytecodeTransformerBuildItem;
 import io.quarkus.deployment.builditem.CuratedApplicationShutdownBuildItem;
 import io.quarkus.deployment.builditem.LaunchModeBuildItem;
 import io.quarkus.deployment.builditem.LiveReloadBuildItem;
-import io.quarkus.deployment.builditem.RemovedResourceBuildItem;
+import io.quarkus.deployment.builditem.RemovedClassesBuildItem;
 import io.quarkus.deployment.builditem.TransformedClassesBuildItem;
 import io.quarkus.deployment.configuration.ClassLoadingConfig;
 import io.quarkus.deployment.index.ConstPoolScanner;
 import io.quarkus.deployment.pkg.PackageConfig;
 import io.quarkus.deployment.pkg.builditem.CurateOutcomeBuildItem;
-import io.quarkus.maven.dependency.ArtifactKey;
-import io.quarkus.maven.dependency.GACT;
-import io.quarkus.maven.dependency.ResolvedDependency;
 import io.quarkus.runtime.LaunchMode;
 
 public class ClassTransformingBuildStep {
@@ -80,16 +76,16 @@ public class ClassTransformingBuildStep {
     }
 
     @BuildStep
+    @Consume(RemovedClassesBuildItem.class)
     TransformedClassesBuildItem handleClassTransformation(List<BytecodeTransformerBuildItem> bytecodeTransformerBuildItems,
             ApplicationArchivesBuildItem appArchives, LiveReloadBuildItem liveReloadBuildItem,
             LaunchModeBuildItem launchModeBuildItem, ClassLoadingConfig classLoadingConfig,
-            CurateOutcomeBuildItem curateOutcomeBuildItem, List<RemovedResourceBuildItem> removedResourceBuildItems,
+            CurateOutcomeBuildItem curateOutcomeBuildItem,
             ArchiveRootBuildItem archiveRoot, LaunchModeBuildItem launchMode, PackageConfig packageConfig,
             ExecutorService buildExecutor,
             CuratedApplicationShutdownBuildItem shutdown)
             throws ExecutionException, InterruptedException {
-        if (bytecodeTransformerBuildItems.isEmpty() && classLoadingConfig.removedResources.isEmpty()
-                && removedResourceBuildItems.isEmpty()) {
+        if (bytecodeTransformerBuildItems.isEmpty() && classLoadingConfig.removedResources.isEmpty()) {
             return new TransformedClassesBuildItem(Collections.emptyMap());
         }
         final Map<String, List<BytecodeTransformerBuildItem>> bytecodeTransformers = new HashMap<>(
@@ -267,7 +263,6 @@ public class ClassTransformingBuildStep {
             }
         }
 
-        handleRemovedResources(classLoadingConfig, curateOutcomeBuildItem, transformedClassesByJar, removedResourceBuildItems);
         if (!transformed.isEmpty()) {
             for (Future<TransformedClassesBuildItem.TransformedClass> i : transformed) {
                 final TransformedClassesBuildItem.TransformedClass res = i.get();
@@ -306,41 +301,6 @@ public class ClassTransformingBuildStep {
             } catch (IOException e) {
                 log.debug("Unable to overwrite file '" + classFilePath.toAbsolutePath() + "' with transformed class data");
             }
-        }
-    }
-
-    private void handleRemovedResources(ClassLoadingConfig classLoadingConfig, CurateOutcomeBuildItem curateOutcomeBuildItem,
-            Map<Path, Set<TransformedClassesBuildItem.TransformedClass>> transformedClassesByJar,
-            List<RemovedResourceBuildItem> removedResourceBuildItems) {
-        //a little bit of a hack, but we use an empty transformed class to represent removed resources, as transforming a class removes it from the original archive
-        Map<ArtifactKey, Set<String>> removed = new HashMap<>();
-        for (Map.Entry<String, Set<String>> entry : classLoadingConfig.removedResources.entrySet()) {
-            removed.put(new GACT(entry.getKey().split(":")), entry.getValue());
-        }
-        for (RemovedResourceBuildItem i : removedResourceBuildItems) {
-            removed.computeIfAbsent(i.getArtifact(), k -> new HashSet<>()).addAll(i.getResources());
-        }
-        if (!removed.isEmpty()) {
-            ApplicationModel applicationModel = curateOutcomeBuildItem.getApplicationModel();
-            Collection<ResolvedDependency> runtimeDependencies = applicationModel.getRuntimeDependencies();
-            List<ResolvedDependency> allArtifacts = new ArrayList<>(runtimeDependencies.size() + 1);
-            allArtifacts.addAll(runtimeDependencies);
-            allArtifacts.add(applicationModel.getAppArtifact());
-            for (ResolvedDependency i : allArtifacts) {
-                Set<String> filtered = removed.remove(i.getKey());
-                if (filtered != null) {
-                    for (Path path : i.getResolvedPaths()) {
-                        transformedClassesByJar.computeIfAbsent(path, s -> new HashSet<>())
-                                .addAll(filtered.stream()
-                                        .map(file -> new TransformedClassesBuildItem.TransformedClass(null, null, file, false))
-                                        .collect(Collectors.toSet()));
-                    }
-                }
-            }
-        }
-        if (!removed.isEmpty()) {
-            log.warn("Could not remove configured resources from the following artifacts as they were not found in the model: "
-                    + removed);
         }
     }
 
