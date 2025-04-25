@@ -24,11 +24,9 @@ import jakarta.interceptor.InvocationContext;
 
 import org.jboss.jandex.AnnotationInstanceEquivalenceProxy;
 import org.jboss.jandex.ClassInfo;
-import org.jboss.jandex.ClassType;
 import org.jboss.jandex.DotName;
 import org.jboss.jandex.IndexView;
 import org.jboss.jandex.MethodInfo;
-import org.jboss.jandex.PrimitiveType;
 import org.jboss.jandex.Type;
 
 import io.quarkus.arc.InjectableReferenceProvider;
@@ -42,6 +40,7 @@ import io.quarkus.gizmo2.Expr;
 import io.quarkus.gizmo2.Gizmo;
 import io.quarkus.gizmo2.LocalVar;
 import io.quarkus.gizmo2.ParamVar;
+import io.quarkus.gizmo2.creator.ClassCreator;
 import io.quarkus.gizmo2.desc.ClassMethodDesc;
 import io.quarkus.gizmo2.desc.ConstructorDesc;
 import io.quarkus.gizmo2.desc.FieldDesc;
@@ -207,6 +206,17 @@ public class InterceptionProxyGenerator extends AbstractGenerator {
             Map<Set<AnnotationInstanceEquivalenceProxy>, String> bindingKeys = new HashMap<>();
             Map<MethodDesc, MethodDesc> forwardingMethods = new HashMap<>();
 
+            for (InterceptedMethod interceptedMethod : info.interceptedMethods()) {
+                MethodInfo method = interceptedMethod.method();
+                MethodDesc forwardDesc = SubclassGenerator.createForwardingMethod(cc, pseudoBeanClass,
+                        method, isInterface, (bc, virtualMethod, params) -> {
+                            return isInterface
+                                    ? bc.invokeInterface(virtualMethod, cc.this_().field(delegateField), params)
+                                    : bc.invokeVirtual(virtualMethod, cc.this_().field(delegateField), params);
+                        });
+                forwardingMethods.put(methodDescOf(method), forwardDesc);
+            }
+
             cc.constructor(mc -> {
                 mc.public_();
                 ParamVar ccParam = mc.parameter("creationalContext", CreationalContext.class);
@@ -234,17 +244,6 @@ public class InterceptionProxyGenerator extends AbstractGenerator {
                         interceptorInstanceToLocalVar.put(id, interceptorInstance);
                     }
 
-                    for (InterceptedMethod interceptedMethod : info.interceptedMethods()) {
-                        MethodInfo method = interceptedMethod.method();
-                        MethodDesc forwardDesc = SubclassGenerator.createForwardingMethod_2(cc, pseudoBeanClass,
-                                method, isInterface, (bytecode, virtualMethod, params) -> {
-                                    return isInterface
-                                            ? bytecode.invokeInterface(virtualMethod, cc.this_().field(delegateField), params)
-                                            : bytecode.invokeVirtual(virtualMethod, cc.this_().field(delegateField), params);
-                                });
-                        forwardingMethods.put(methodDescOf(method), forwardDesc);
-                    }
-
                     LocalVar interceptorChainMap = bc.localVar("interceptorChainMap", bc.new_(HashMap.class));
                     LocalVar bindingsMap = bc.localVar("bindingsMap", bc.new_(HashMap.class));
 
@@ -252,9 +251,9 @@ public class InterceptionProxyGenerator extends AbstractGenerator {
                     IntegerHolder chainIdx = new IntegerHolder();
                     IntegerHolder bindingIdx = new IntegerHolder();
                     Map<AnnotationInstanceEquivalenceProxy, Expr> bindingsLiterals = new HashMap<>();
-                    var bindingsFun = SubclassGenerator.createBindingsFun_2(bindingIdx, bc, bindingsMap, bindingsLiterals,
+                    var bindingsFun = SubclassGenerator.createBindingsFun(bindingIdx, bc, bindingsMap, bindingsLiterals,
                             pseudoBean, annotationLiterals);
-                    var interceptorChainKeysFun = SubclassGenerator.createInterceptorChainKeysFun_2(chainIdx, bc,
+                    var interceptorChainKeysFun = SubclassGenerator.createInterceptorChainKeysFun(chainIdx, bc,
                             interceptorChainMap, interceptorInstanceToLocalVar, interceptorBeanToLocalVar);
 
                     for (InterceptedMethod interceptedMethod : info.interceptedMethods()) {
@@ -282,105 +281,8 @@ public class InterceptionProxyGenerator extends AbstractGenerator {
             });
 
             for (MethodGroup group : info.methodGroups()) {
-                cc.method("arc$initMetadata" + group.id(), mc -> {
-                    mc.private_();
-                    mc.returning(void.class);
-                    ParamVar interceptorChainMapParam = mc.parameter("interceptorChainMap", Map.class);
-                    ParamVar bindingsMapParam = mc.parameter("bindingsMap", Map.class);
-                    mc.body(bc -> {
-                        // to avoid repeatedly looking for the exact same thing in the maps
-                        Map<String, LocalVar> chains = new HashMap<>();
-                        Map<String, LocalVar> bindings = new HashMap<>();
-
-                        for (InterceptedMethod interceptedMethod : group.interceptedMethods()) {
-                            MethodInfo method = interceptedMethod.method();
-                            MethodDesc methodDesc = methodDescOf(method);
-                            BeanInfo.InterceptionInfo interception = interceptedMethod.interception();
-                            List<Type> parameters = method.parameterTypes();
-
-                            // 1. Interceptor chain
-                            String interceptorChainKey = interceptorChainKeys.get(interception.interceptors);
-                            LocalVar chainArg = chains.computeIfAbsent(interceptorChainKey, ignored -> {
-                                return bc.localVar("interceptorChain", bc.withMap(interceptorChainMapParam)
-                                        .get(Const.of(interceptorChainKey)));
-                            });
-
-                            // 2. Method method = Reflections.findMethod(org.jboss.weld.arc.test.interceptors.SimpleBean.class,"foo",java.lang.String.class)
-                            Expr[] args = new Expr[3];
-                            args[0] = Const.of(pseudoBeanClass);
-                            args[1] = Const.of(method.name());
-                            if (!parameters.isEmpty()) {
-                                LocalVar paramTypes = bc.localVar("paramTypes",
-                                        bc.newEmptyArray(Class.class, parameters.size()));
-                                for (int i = 0; i < parameters.size(); i++) {
-                                    bc.set(paramTypes.elem(i), Const.of(classDescOf(parameters.get(i))));
-                                }
-                                args[2] = paramTypes;
-                            } else {
-                                args[2] = bc.getStaticField(FieldDescs.ANNOTATION_LITERALS_EMPTY_CLASS_ARRAY);
-                            }
-                            Expr methodArg = bc.invokeStatic(MethodDescs.REFLECTIONS_FIND_METHOD, args);
-
-                            // 3. Interceptor bindings
-                            String bindingKey = bindingKeys.get(interception.bindingsEquivalenceProxies());
-                            LocalVar bindingsArg = bindings.computeIfAbsent(bindingKey, ignored -> {
-                                return bc.localVar("bindings", bc.withMap(bindingsMapParam)
-                                        .get(Const.of(bindingKey)));
-                            });
-
-                            // Instantiate the forwarding function
-                            // BiFunction<Object, InvocationContext, Object> forward = (target, ctx) -> target.foo$$superforward((java.lang.String)ctx.getParameters()[0])
-                            Expr forwardFunArg = bc.lambda(BiFunction.class, lc -> {
-                                ParamVar target = lc.parameter("target", 0);
-                                ParamVar ctx = lc.parameter("ctx", 1);
-                                lc.body(lbc -> {
-                                    // TODO need to cast explicitly due to Gizmo 2 not casting automatically
-                                    Expr castTarget = lbc.cast(target, classDescOf(method.declaringClass()));
-                                    Expr[] superArgs;
-                                    if (parameters.isEmpty()) {
-                                        superArgs = new Expr[0];
-                                    } else {
-                                        Expr ctxArgs = lbc.localVar("args", lbc.invokeInterface(
-                                                MethodDesc.of(InvocationContext.class, "getParameters", Object[].class), ctx));
-                                        superArgs = new Expr[parameters.size()];
-                                        for (int i = 0; i < parameters.size(); i++) {
-                                            if (method.parameterType(i).kind() == Type.Kind.PRIMITIVE) {
-                                                // TODO need to cast explicitly due to Gizmo 2 not casting automatically
-                                                ClassType box = PrimitiveType.box(method.parameterType(i).asPrimitiveType());
-                                                superArgs[i] = lbc.cast(ctxArgs.elem(i), classDescOf(box));
-                                            } else {
-                                                superArgs[i] = ctxArgs.elem(i);
-                                            }
-                                        }
-                                    }
-                                    Expr superResult = isInterface
-                                            ? lbc.invokeInterface(methodDesc, castTarget, superArgs)
-                                            : lbc.invokeVirtual(methodDesc, castTarget, superArgs);
-                                    lbc.return_(superResult);
-                                });
-                            });
-
-                            // Now create metadata for the given intercepted method
-                            Expr methodMetadata = bc.new_(MethodDescs.INTERCEPTED_METHOD_METADATA_CONSTRUCTOR,
-                                    chainArg, methodArg, bindingsArg, forwardFunArg);
-
-                            FieldDesc metadataField = FieldDesc.of(cc.type(), "arc$" + interceptedMethod.index,
-                                    InterceptedMethodMetadata.class);
-
-                            bc.set(cc.this_().field(metadataField), methodMetadata);
-
-                            // Needed when running on native image
-                            reflectionRegistration.registerMethod(method);
-
-                            // Finally create the intercepted method
-                            MethodDesc forwardDescriptor = forwardingMethods.get(methodDesc);
-                            SubclassGenerator.createInterceptedMethod_2(method, cc, metadataField, constructedField,
-                                    forwardDescriptor, ignored -> cc.this_().field(delegateField));
-                        }
-
-                        bc.return_();
-                    });
-                });
+                createInitMetadataMethod(cc, pseudoBeanClass, isInterface, constructedField, delegateField, group,
+                        forwardingMethods, interceptorChainKeys, bindingKeys);
             }
 
             cc.method("arc_delegate", mc -> {
@@ -406,6 +308,104 @@ public class InterceptionProxyGenerator extends AbstractGenerator {
                     });
                 });
             }
+        });
+    }
+
+    private void createInitMetadataMethod(ClassCreator cc, ClassDesc pseudoBeanClass, boolean isInterface,
+            FieldDesc constructedField, FieldDesc delegateField, MethodGroup group,
+            Map<MethodDesc, MethodDesc> forwardingMethods, Map<List<InterceptorInfo>, String> interceptorChainKeys,
+            Map<Set<AnnotationInstanceEquivalenceProxy>, String> bindingKeys) {
+
+        cc.method("arc$initMetadata" + group.id(), mc -> {
+            mc.private_();
+            mc.returning(void.class);
+            ParamVar interceptorChainMapParam = mc.parameter("interceptorChainMap", Map.class);
+            ParamVar bindingsMapParam = mc.parameter("bindingsMap", Map.class);
+            mc.body(bc -> {
+                // to avoid repeatedly looking for the exact same thing in the maps
+                Map<String, LocalVar> chains = new HashMap<>();
+                Map<String, LocalVar> bindings = new HashMap<>();
+
+                for (InterceptedMethod interceptedMethod : group.interceptedMethods()) {
+                    MethodInfo method = interceptedMethod.method();
+                    MethodDesc methodDesc = methodDescOf(method);
+                    BeanInfo.InterceptionInfo interception = interceptedMethod.interception();
+                    List<Type> parameters = method.parameterTypes();
+
+                    // 1. Interceptor chain
+                    String interceptorChainKey = interceptorChainKeys.get(interception.interceptors);
+                    LocalVar chainArg = chains.computeIfAbsent(interceptorChainKey, ignored -> {
+                        return bc.localVar("interceptorChain", bc.withMap(interceptorChainMapParam)
+                                .get(Const.of(interceptorChainKey)));
+                    });
+
+                    // 2. Method method = Reflections.findMethod(org.jboss.weld.arc.test.interceptors.SimpleBean.class,"foo",java.lang.String.class)
+                    Expr[] args = new Expr[3];
+                    args[0] = Const.of(pseudoBeanClass);
+                    args[1] = Const.of(method.name());
+                    if (!parameters.isEmpty()) {
+                        LocalVar paramTypes = bc.localVar("paramTypes",
+                                bc.newEmptyArray(Class.class, parameters.size()));
+                        for (int i = 0; i < parameters.size(); i++) {
+                            bc.set(paramTypes.elem(i), Const.of(classDescOf(parameters.get(i))));
+                        }
+                        args[2] = paramTypes;
+                    } else {
+                        args[2] = bc.getStaticField(FieldDescs.ANNOTATION_LITERALS_EMPTY_CLASS_ARRAY);
+                    }
+                    Expr methodArg = bc.invokeStatic(MethodDescs.REFLECTIONS_FIND_METHOD, args);
+
+                    // 3. Interceptor bindings
+                    String bindingKey = bindingKeys.get(interception.bindingsEquivalenceProxies());
+                    LocalVar bindingsArg = bindings.computeIfAbsent(bindingKey, ignored -> {
+                        return bc.localVar("bindings", bc.withMap(bindingsMapParam)
+                                .get(Const.of(bindingKey)));
+                    });
+
+                    // Instantiate the forwarding function
+                    // BiFunction<Object, InvocationContext, Object> forward = (target, ctx) -> target.foo$$superforward((java.lang.String)ctx.getParameters()[0])
+                    Expr forwardFunArg = bc.lambda(BiFunction.class, lc -> {
+                        ParamVar target = lc.parameter("target", 0);
+                        ParamVar ctx = lc.parameter("ctx", 1);
+                        lc.body(lbc -> {
+                            Expr[] superArgs;
+                            if (parameters.isEmpty()) {
+                                superArgs = new Expr[0];
+                            } else {
+                                Expr ctxArgs = lbc.localVar("args", lbc.invokeInterface(
+                                        MethodDesc.of(InvocationContext.class, "getParameters", Object[].class), ctx));
+                                superArgs = new Expr[parameters.size()];
+                                for (int i = 0; i < parameters.size(); i++) {
+                                    superArgs[i] = ctxArgs.elem(i);
+                                }
+                            }
+                            Expr superResult = isInterface
+                                    ? lbc.invokeInterface(methodDesc, target, superArgs)
+                                    : lbc.invokeVirtual(methodDesc, target, superArgs);
+                            lbc.return_(superResult);
+                        });
+                    });
+
+                    // Now create metadata for the given intercepted method
+                    Expr methodMetadata = bc.new_(MethodDescs.INTERCEPTED_METHOD_METADATA_CONSTRUCTOR,
+                            chainArg, methodArg, bindingsArg, forwardFunArg);
+
+                    FieldDesc metadataField = FieldDesc.of(cc.type(), "arc$" + interceptedMethod.index,
+                            InterceptedMethodMetadata.class);
+
+                    bc.set(cc.this_().field(metadataField), methodMetadata);
+
+                    // Needed when running on native image
+                    reflectionRegistration.registerMethod(method);
+
+                    // Finally create the intercepted method
+                    MethodDesc forwardDescriptor = forwardingMethods.get(methodDesc);
+                    SubclassGenerator.createInterceptedMethod(method, cc, metadataField, constructedField,
+                            forwardDescriptor, () -> cc.this_().field(delegateField));
+                }
+
+                bc.return_();
+            });
         });
     }
 

@@ -31,6 +31,7 @@ import org.objectweb.asm.Opcodes;
 
 import io.quarkus.gizmo.ClassTransformer;
 import io.quarkus.gizmo.MethodDescriptor;
+import io.quarkus.gizmo2.desc.MethodDesc;
 
 /**
  *
@@ -655,6 +656,11 @@ final class Methods {
     static boolean descriptorMatches(MethodDescriptor d1, MethodDescriptor d2) {
         return d1.getName().equals(d2.getName())
                 && d1.getDescriptor().equals(d2.getDescriptor());
+    }
+
+    static boolean descriptorMatches(MethodDesc d1, MethodDesc d2) {
+        // do _not_ compare `owner` here
+        return d1.name().equals(d2.name()) && d1.type().equals(d2.type());
     }
 
 }
