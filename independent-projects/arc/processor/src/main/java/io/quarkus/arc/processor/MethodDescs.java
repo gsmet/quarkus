@@ -129,6 +129,8 @@ public final class MethodDescs {
 
     public static final MethodDesc CLIENT_PROXY_UNWRAP = MethodDesc.of(ClientProxy.class, "unwrap", Object.class, Object.class);
 
+    public static final MethodDesc INJECTABLE_BEAN_GET_SCOPE = MethodDesc.of(InjectableBean.class, "getScope", Class.class);
+
     public static final MethodDesc INJECTABLE_BEAN_DESTROY = MethodDesc.of(InjectableBean.class, "destroy", void.class,
             Object.class, CreationalContext.class);
 
