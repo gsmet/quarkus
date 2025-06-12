@@ -1,5 +1,6 @@
 package io.quarkus.arc.processor;
 
+import java.lang.constant.ClassDesc;
 import java.util.Collections;
 
 import jakarta.enterprise.inject.Any;
@@ -10,6 +11,9 @@ import org.jboss.jandex.AnnotationInstance;
 import io.quarkus.gizmo.BytecodeCreator;
 import io.quarkus.gizmo.FieldDescriptor;
 import io.quarkus.gizmo.ResultHandle;
+import io.quarkus.gizmo2.Expr;
+import io.quarkus.gizmo2.StaticFieldVar;
+import io.quarkus.gizmo2.desc.FieldDesc;
 
 enum BuiltinQualifier {
 
@@ -33,6 +37,11 @@ enum BuiltinQualifier {
 
     ResultHandle getLiteralInstance(BytecodeCreator creator) {
         return creator.readStaticField(FieldDescriptor.of(literalType, "INSTANCE", literalType));
+    }
+
+    StaticFieldVar getLiteralInstance_2() {
+        ClassDesc literalClass = ClassDesc.of(literalType);
+        return Expr.staticField(FieldDesc.of(literalClass, "INSTANCE", literalClass));
     }
 
     static BuiltinQualifier of(AnnotationInstance instance) {
