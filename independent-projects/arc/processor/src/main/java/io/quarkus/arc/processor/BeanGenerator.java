@@ -29,7 +29,6 @@ import jakarta.enterprise.context.spi.Contextual;
 import jakarta.enterprise.context.spi.CreationalContext;
 import jakarta.enterprise.inject.CreationException;
 import jakarta.enterprise.inject.IllegalProductException;
-import jakarta.enterprise.inject.TransientReference;
 import jakarta.enterprise.inject.UnproxyableResolutionException;
 import jakarta.enterprise.inject.literal.InjectLiteral;
 import jakarta.enterprise.inject.spi.InterceptionType;
@@ -143,14 +142,9 @@ public class BeanGenerator extends AbstractGenerator {
 
     private void generateClassBeanName(BeanInfo bean) {
         ClassInfo beanClass = bean.getTarget().get().asClass();
-        String baseName;
-        if (beanClass.enclosingClass() != null) {
-            baseName = DotNames.simpleName(beanClass.enclosingClass()) + UNDERSCORE + DotNames.simpleName(beanClass);
-        } else {
-            baseName = DotNames.simpleName(beanClass);
-        }
+        String baseName = beanClass.name().withoutPackagePrefix();
         this.beanToGeneratedBaseName.put(bean, baseName);
-        String targetPackage = DotNames.packageName(bean.getProviderType().name());
+        String targetPackage = DotNames.packagePrefix(bean.getProviderType().name());
         String generatedName = generatedNameFromTarget(targetPackage, baseName, BEAN_SUFFIX);
         this.beanToGeneratedName.put(bean, generatedName);
     }
@@ -158,13 +152,7 @@ public class BeanGenerator extends AbstractGenerator {
     private void generateProducerMethodBeanName(BeanInfo bean) {
         MethodInfo producerMethod = bean.getTarget().get().asMethod();
         ClassInfo declaringClass = producerMethod.declaringClass();
-        String declaringClassBase;
-        if (declaringClass.enclosingClass() != null) {
-            declaringClassBase = DotNames.simpleName(declaringClass.enclosingClass()) + UNDERSCORE
-                    + DotNames.simpleName(declaringClass);
-        } else {
-            declaringClassBase = DotNames.simpleName(declaringClass);
-        }
+        String declaringClassBase = declaringClass.name().withoutPackagePrefix();
 
         StringBuilder sigBuilder = new StringBuilder();
         sigBuilder.append(producerMethod.name())
@@ -177,7 +165,7 @@ public class BeanGenerator extends AbstractGenerator {
         String baseName = declaringClassBase + PRODUCER_METHOD_SUFFIX + UNDERSCORE + producerMethod.name() + UNDERSCORE
                 + Hashes.sha1_base64(sigBuilder.toString());
         this.beanToGeneratedBaseName.put(bean, baseName);
-        String targetPackage = DotNames.packageName(declaringClass.name());
+        String targetPackage = DotNames.packagePrefix(declaringClass.name());
         String generatedName = generatedNameFromTarget(targetPackage, baseName, BEAN_SUFFIX);
         this.beanToGeneratedName.put(bean, generatedName);
     }
@@ -185,34 +173,18 @@ public class BeanGenerator extends AbstractGenerator {
     private void generateProducerFieldBeanName(BeanInfo bean) {
         FieldInfo producerField = bean.getTarget().get().asField();
         ClassInfo declaringClass = producerField.declaringClass();
-        String declaringClassBase;
-        if (declaringClass.enclosingClass() != null) {
-            declaringClassBase = DotNames.simpleName(declaringClass.enclosingClass()) + UNDERSCORE
-                    + DotNames.simpleName(declaringClass);
-        } else {
-            declaringClassBase = DotNames.simpleName(declaringClass);
-        }
+        String declaringClassBase = declaringClass.name().withoutPackagePrefix();
 
         String baseName = declaringClassBase + PRODUCER_FIELD_SUFFIX + UNDERSCORE + producerField.name();
         this.beanToGeneratedBaseName.put(bean, baseName);
-        String targetPackage = DotNames.packageName(declaringClass.name());
+        String targetPackage = DotNames.packagePrefix(declaringClass.name());
         String generatedName = generatedNameFromTarget(targetPackage, baseName, BEAN_SUFFIX);
         this.beanToGeneratedName.put(bean, generatedName);
     }
 
     private void generateSyntheticBeanName(BeanInfo bean) {
-        StringBuilder baseNameBuilder = new StringBuilder();
-        if (bean.getImplClazz().enclosingClass() != null) {
-            baseNameBuilder.append(DotNames.simpleName(bean.getImplClazz().enclosingClass())).append(UNDERSCORE)
-                    .append(DotNames.simpleName(bean.getImplClazz()));
-        } else {
-            baseNameBuilder.append(DotNames.simpleName(bean.getImplClazz()));
-        }
-        baseNameBuilder.append(UNDERSCORE);
-        baseNameBuilder.append(bean.getIdentifier());
-        baseNameBuilder.append(UNDERSCORE);
-        baseNameBuilder.append(SYNTHETIC_SUFFIX);
-        String baseName = baseNameBuilder.toString();
+        String baseName = bean.getImplClazz().name().withoutPackagePrefix() + UNDERSCORE + bean.getIdentifier()
+                + UNDERSCORE + SYNTHETIC_SUFFIX;
         this.beanToGeneratedBaseName.put(bean, baseName);
         String targetPackage = bean.getTargetPackageName();
         this.beanToGeneratedName.put(bean, generatedNameFromTarget(targetPackage, baseName, BEAN_SUFFIX));
@@ -241,7 +213,7 @@ public class BeanGenerator extends AbstractGenerator {
         String baseName = beanToGeneratedBaseName.get(bean);
         String targetPackage = bean.isSynthetic()
                 ? bean.getTargetPackageName()
-                : DotNames.packageName(bean.isProducer() ? clazz.name() : providerType.name());
+                : DotNames.packagePrefix(bean.isProducer() ? clazz.name() : providerType.name());
         String generatedName = beanToGeneratedName.get(bean);
         if (existingClasses.contains(generatedName)) {
             return Collections.emptyList();
@@ -262,8 +234,7 @@ public class BeanGenerator extends AbstractGenerator {
 
     private void generateBean(io.quarkus.gizmo2.Gizmo gizmo, BeanInfo bean, String generatedName, String baseName,
             String targetPackage, boolean isApplicationClass, ProviderType providerType) {
-        // TODO generated name includes `/` instead of `.`
-        gizmo.class_(generatedName.replace('/', '.'), cc -> {
+        gizmo.class_(generatedName, cc -> {
             cc.implements_(InjectableBean.class);
             cc.implements_(Supplier.class);
 
@@ -877,9 +848,7 @@ public class BeanGenerator extends AbstractGenerator {
             // and also the CDI specification:
             //
             // > Invocations of initializer methods by the container are not business method invocations.
-            // TODO generated name includes `/` instead of `.`
-            ClassDesc subclass = ClassDesc.of(SubclassGenerator.generatedName(bean.getProviderType().name(), baseName)
-                    .replace('/', '.'));
+            ClassDesc subclass = ClassDesc.of(SubclassGenerator.generatedName(bean.getProviderType().name(), baseName));
             // TODO need to cast explicitly due to Gizmo 2 not casting automatically
             Expr castInstance = bc.cast(instance, subclass);
             bc.invokeVirtual(ClassMethodDesc.of(subclass, SubclassGenerator.MARK_CONSTRUCTED_METHOD_NAME, void.class),
@@ -1014,9 +983,7 @@ public class BeanGenerator extends AbstractGenerator {
                 args.add(providers.get(injectionPoints.size() + interceptors.size() + i));
             }
 
-            // TODO generated name includes `/` instead of `.`
-            ClassDesc subclass = ClassDesc.of(SubclassGenerator.generatedName(bean.getProviderType().name(), baseName)
-                    .replace('/', '.'));
+            ClassDesc subclass = ClassDesc.of(SubclassGenerator.generatedName(bean.getProviderType().name(), baseName));
             return bc.new_(ConstructorDesc.of(subclass, paramTypes), args);
         } else if (constructorInjection.isPresent()) {
             if (Modifier.isPrivate(constructor.flags())) {
@@ -1555,9 +1522,8 @@ public class BeanGenerator extends AbstractGenerator {
                                     // }
                                     new PreDestroyGenerator().generate(b1, instance);
                                 } else {
-                                    // TODO generated name includes `/` instead of `.`
                                     ClassDesc subclass = ClassDesc.of(SubclassGenerator.generatedName(
-                                            bean.getProviderType().name(), baseName).replace('/', '.'));
+                                            bean.getProviderType().name(), baseName));
 
                                     // if there _is_ some `@PreDestroy` interceptor, however, we'll reify the chain of `@PreDestroy`
                                     // callbacks into a `Runnable` that we pass into the interceptor chain to be called

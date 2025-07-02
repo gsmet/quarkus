@@ -88,8 +88,7 @@ public class SubclassGenerator extends AbstractGenerator {
     private final AnnotationLiteralProcessor annotationLiterals;
 
     static String generatedName(DotName providerTypeName, String baseName) {
-        String packageName = DotNames.internalPackageNameWithTrailingSlash(providerTypeName);
-        return packageName + baseName + SUBCLASS_SUFFIX;
+        return generatedNameFromTarget(DotNames.packagePrefix(providerTypeName), baseName, SUBCLASS_SUFFIX);
     }
 
     SubclassGenerator(AnnotationLiteralProcessor annotationLiterals, Predicate<DotName> applicationClassPredicate,
@@ -104,7 +103,7 @@ public class SubclassGenerator extends AbstractGenerator {
 
     Collection<Resource> generate(BeanInfo bean, String beanClassName) {
         Type providerType = bean.getProviderType();
-        String baseName = getBaseName(beanClassName);
+        String baseName = getBeanBaseName(beanClassName);
         String generatedName = generatedName(providerType.name(), baseName);
         if (existingClasses.contains(generatedName)) {
             return Collections.emptyList();
@@ -128,8 +127,7 @@ public class SubclassGenerator extends AbstractGenerator {
         InterceptionInfo preDestroyInterception = bean.getLifecycleInterceptors(InterceptionType.PRE_DESTROY);
 
         // Foo_Subclass extends Foo implements Subclass
-        // TODO generated name includes `/` instead of `.`
-        gizmo.class_(generatedName.replace('/', '.'), cc -> {
+        gizmo.class_(generatedName, cc -> {
             cc.extends_(classDescOf(providerType));
             cc.implements_(Subclass.class);
 
@@ -444,14 +442,12 @@ public class SubclassGenerator extends AbstractGenerator {
                                     // If a decorator is bound then invoke the method upon the decorator instance instead of the generated forwarding method
                                     ClassDesc declaringClass = classDescOf(decoratorMethod.decorator.getBeanClass());
                                     if (decoratorMethod.decorator.isAbstract()) {
-                                        String baseName = DecoratorGenerator.createBaseName(
-                                                decoratorMethod.decorator.getTarget().get().asClass());
-                                        String targetPackage = DotNames.packageName(
+                                        String baseName = decoratorMethod.decorator.getTarget().get().asClass()
+                                                .name().withoutPackagePrefix();
+                                        String targetPackage = DotNames.packagePrefix(
                                                 decoratorMethod.decorator.getProviderType().name());
                                         String generatedName = generatedNameFromTarget(targetPackage, baseName,
                                                 DecoratorGenerator.ABSTRACT_IMPL_SUFFIX);
-                                        // TODO generated name includes `/` instead of `.`
-                                        generatedName = generatedName.replace('/', '.');
                                         declaringClass = ClassDesc.of(generatedName);
                                     }
                                     // We need to use the decorator method in order to support generic decorators
@@ -531,14 +527,11 @@ public class SubclassGenerator extends AbstractGenerator {
                                         firstDecorator.getIdentifier(), Object.class));
                                 ClassDesc declaringClass = classDescOf(firstDecorator.getBeanClass());
                                 if (firstDecorator.isAbstract()) {
-                                    String baseName = DecoratorGenerator.createBaseName(
-                                            firstDecorator.getTarget().get().asClass());
-                                    String targetPackage = DotNames.packageName(
+                                    String baseName = firstDecorator.getTarget().get().asClass().name().withoutPackagePrefix();
+                                    String targetPackage = DotNames.packagePrefix(
                                             firstDecorator.getProviderType().name());
                                     String declaringClassName = generatedNameFromTarget(targetPackage, baseName,
                                             DecoratorGenerator.ABSTRACT_IMPL_SUFFIX);
-                                    // TODO generated name includes `/` instead of `.`
-                                    declaringClassName = declaringClassName.replace('/', '.');
                                     declaringClass = ClassDesc.of(declaringClassName);
                                 }
                                 // We need to use the decorator method in order to support generic decorators
@@ -627,10 +620,10 @@ public class SubclassGenerator extends AbstractGenerator {
         ClassInfo decoratorClass = decorator.getTarget().get().asClass();
         String baseName;
         if (decoratorClass.enclosingClass() != null) {
-            baseName = DotNames.simpleName(decoratorClass.enclosingClass()) + UNDERSCORE
-                    + DotNames.simpleName(decoratorClass);
+            baseName = decoratorClass.enclosingClass().withoutPackagePrefix() + UNDERSCORE
+                    + decoratorClass.name().withoutPackagePrefix();
         } else {
-            baseName = DotNames.simpleName(decoratorClass);
+            baseName = decoratorClass.name().withoutPackagePrefix();
         }
         // Name: AlphaDecorator_FooBeanId_Delegate_Subclass
         String generatedName = generatedName(providerType.name(),
@@ -651,8 +644,7 @@ public class SubclassGenerator extends AbstractGenerator {
 
         List<ClassDesc> delegateSubclassCtorParams = new ArrayList<>();
 
-        // TODO generated name contains `/` instead of `.`
-        ClassDesc delegateSubclass = gizmo.class_(generatedName.replace('/', '.'), cc -> {
+        ClassDesc delegateSubclass = gizmo.class_(generatedName, cc -> {
             ClassInfo delegateTypeClass = decorator.getDelegateTypeClass();
             boolean delegateTypeIsInterface = delegateTypeClass.isInterface();
             // The subclass implements/extends the delegate type
