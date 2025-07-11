@@ -46,4 +46,9 @@ final class StepInfo {
     int getOrdinal() {
         return ordinal;
     }
+
+    @Override
+    public String toString() {
+        return buildStep.toString() + " (" + ordinal + ")";
+    }
 }

@@ -420,7 +420,7 @@ public final class BuildChainBuilder {
         }
         final Set<Produce> dependenciesOfThis = dependencies.getOrDefault(toBuild, Collections.emptySet());
         int includedDependencies = 0;
-        final Set<BuildStepBuilder> visited = new HashSet<>();
+        final Set<BuildStepBuilder> visited = new LinkedHashSet<>();
         for (Produce produce : dependenciesOfThis) {
             final BuildStepBuilder stepBuilder = produce.getStepBuilder();
             if (included.contains(stepBuilder) && visited.add(stepBuilder)) {
