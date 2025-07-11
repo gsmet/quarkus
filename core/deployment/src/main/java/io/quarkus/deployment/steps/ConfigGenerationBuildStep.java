@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 import jakarta.annotation.Priority;
@@ -411,7 +412,7 @@ public class ConfigGenerationBuildStep {
             excludedConfigKeys.add(item.getConfigKey());
         }
 
-        Map<String, ConfigValue> values = new HashMap<>();
+        Map<String, ConfigValue> values = new TreeMap<>();
         BuildTimeConfigurationReader.ReadResult readResult = configItem.getReadResult();
         for (final Map.Entry<String, ConfigValue> entry : readResult.getAllBuildTimeValues().entrySet()) {
             if (excludedConfigKeys.contains(entry.getKey())) {
