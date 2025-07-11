@@ -18,6 +18,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -120,7 +122,7 @@ public class ClassTransformingBuildStep {
         // we also record if any additional archives needed transformation
         // when we copy these archives we will remove the problematic classes
         final ConcurrentLinkedDeque<Future<TransformedClassesBuildItem.TransformedClass>> transformed = new ConcurrentLinkedDeque<>();
-        final Map<Path, Set<TransformedClassesBuildItem.TransformedClass>> transformedClassesByJar = new HashMap<>();
+        final Map<Path, Set<TransformedClassesBuildItem.TransformedClass>> transformedClassesByJar = new TreeMap<>();
         ClassLoader transformCl = Thread.currentThread().getContextClassLoader();
         shutdown.addCloseTask(ClassTransformingBuildStep::reset, true);
         lastTransformers = new BiFunction<String, byte[], byte[]>() {
@@ -330,7 +332,7 @@ public class ClassTransformingBuildStep {
                 Set<String> filtered = removed.remove(i.getKey());
                 if (filtered != null) {
                     for (Path path : i.getResolvedPaths()) {
-                        transformedClassesByJar.computeIfAbsent(path, s -> new HashSet<>())
+                        transformedClassesByJar.computeIfAbsent(path, s -> new TreeSet<>())
                                 .addAll(filtered.stream()
                                         .map(file -> new TransformedClassesBuildItem.TransformedClass(null, null, file, false))
                                         .collect(Collectors.toSet()));
@@ -390,7 +392,7 @@ public class ClassTransformingBuildStep {
     private void handleTransformedClass(Map<String, Path> transformedToArchive,
             Map<Path, Set<TransformedClassesBuildItem.TransformedClass>> transformedClassesByJar,
             TransformedClassesBuildItem.TransformedClass res) {
-        transformedClassesByJar.computeIfAbsent(transformedToArchive.get(res.getFileName()), (a) -> new HashSet<>())
+        transformedClassesByJar.computeIfAbsent(transformedToArchive.get(res.getFileName()), (a) -> new TreeSet<>())
                 .add(res);
     }
 

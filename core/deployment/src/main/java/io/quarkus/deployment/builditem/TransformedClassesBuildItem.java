@@ -5,6 +5,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.SortedMap;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import io.quarkus.builder.item.SimpleBuildItem;
@@ -18,15 +21,15 @@ import io.quarkus.builder.item.SimpleBuildItem;
  */
 public final class TransformedClassesBuildItem extends SimpleBuildItem {
 
-    private final Map<Path, Set<TransformedClass>> transformedClassesByJar;
-    private final Map<Path, Set<String>> transformedFilesByJar;
+    private final SortedMap<Path, Set<TransformedClass>> transformedClassesByJar;
+    private final SortedMap<Path, Set<String>> transformedFilesByJar;
 
     public TransformedClassesBuildItem(Map<Path, Set<TransformedClass>> transformedClassesByJar) {
-        this.transformedClassesByJar = new HashMap<>(transformedClassesByJar);
-        this.transformedFilesByJar = new HashMap<>();
+        this.transformedClassesByJar = new TreeMap<>(transformedClassesByJar);
+        this.transformedFilesByJar = new TreeMap<>();
         for (Map.Entry<Path, Set<TransformedClass>> e : transformedClassesByJar.entrySet()) {
             transformedFilesByJar.put(e.getKey(),
-                    e.getValue().stream().map(TransformedClass::getFileName).collect(Collectors.toSet()));
+                    e.getValue().stream().map(TransformedClass::getFileName).collect(Collectors.toCollection(TreeSet::new)));
         }
     }
 
@@ -38,7 +41,7 @@ public final class TransformedClassesBuildItem extends SimpleBuildItem {
         return transformedFilesByJar;
     }
 
-    public static class TransformedClass {
+    public static class TransformedClass implements Comparable<TransformedClass> {
 
         private final String className;
         /**
@@ -90,6 +93,11 @@ public final class TransformedClassesBuildItem extends SimpleBuildItem {
         @Override
         public int hashCode() {
             return Objects.hash(fileName);
+        }
+
+        @Override
+        public int compareTo(TransformedClass o) {
+            return this.fileName.compareTo(o.fileName);
         }
     }
 }
