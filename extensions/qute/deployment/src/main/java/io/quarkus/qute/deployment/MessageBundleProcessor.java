@@ -6,6 +6,7 @@ import static java.util.stream.Collectors.toMap;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.constant.ClassDesc;
 import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -80,6 +81,8 @@ import io.quarkus.gizmo.MethodCreator;
 import io.quarkus.gizmo.MethodDescriptor;
 import io.quarkus.gizmo.ResultHandle;
 import io.quarkus.gizmo.TryBlock;
+import io.quarkus.gizmo2.creator.BlockCreator;
+import io.quarkus.gizmo2.desc.ConstructorDesc;
 import io.quarkus.qute.EvalContext;
 import io.quarkus.qute.EvaluatedParams;
 import io.quarkus.qute.Expression;
@@ -272,22 +275,25 @@ public class MessageBundleProcessor {
 
         // Generate implementations
         // name -> impl class
-        Map<String, String> generatedImplementations = generateImplementations(bundles, generatedClasses,
+        Map<String, ClassDesc> generatedImplementations = generateImplementations(bundles, generatedClasses,
                 messageTemplateMethods, index);
 
         // Register synthetic beans
         for (MessageBundleBuildItem bundle : bundles) {
             ClassInfo bundleInterface = bundle.getDefaultBundleInterface();
-            beanRegistration.getContext().configure(bundleInterface.name()).addType(bundle.getDefaultBundleInterface().name())
+            beanRegistration.getContext().configure(bundleInterface.name())
+                    .addType(bundle.getDefaultBundleInterface().name())
                     // The default message bundle - add both @Default and @Localized
                     .addQualifier(DotNames.DEFAULT).addQualifier().annotation(Names.LOCALIZED)
                     .addValue("value", getDefaultLocale(bundleInterface.declaredAnnotation(Names.BUNDLE), locales)).done()
                     .unremovable()
-                    .scope(Singleton.class).creator(mc -> {
+                    .scope(Singleton.class)
+                    .creator(cg -> {
+                        BlockCreator bc = cg.createMethod();
+
                         // Just create a new instance of the generated class
-                        mc.returnValue(
-                                mc.newInstance(MethodDescriptor
-                                        .ofConstructor(generatedImplementations.get(bundleInterface.name().toString()))));
+                        bc.return_(bc.new_(ConstructorDesc.of(
+                                generatedImplementations.get(bundleInterface.name().toString()))));
                     }).done();
 
             // Localized interfaces
@@ -296,11 +302,13 @@ public class MessageBundleProcessor {
                         .addType(bundle.getDefaultBundleInterface().name())
                         .addQualifier(localizedInterface.declaredAnnotation(Names.LOCALIZED))
                         .unremovable()
-                        .scope(Singleton.class).creator(mc -> {
+                        .scope(Singleton.class)
+                        .creator(cg -> {
+                            BlockCreator bc = cg.createMethod();
+
                             // Just create a new instance of the generated class
-                            mc.returnValue(
-                                    mc.newInstance(MethodDescriptor.ofConstructor(
-                                            generatedImplementations.get(localizedInterface.name().toString()))));
+                            bc.return_(bc.new_(ConstructorDesc.of(
+                                    generatedImplementations.get(localizedInterface.name().toString()))));
                         }).done();
             }
             // Localized files
@@ -310,11 +318,12 @@ public class MessageBundleProcessor {
                         .addQualifier().annotation(Names.LOCALIZED)
                         .addValue("value", entry.getKey()).done()
                         .unremovable()
-                        .scope(Singleton.class).creator(mc -> {
+                        .scope(Singleton.class).creator(cg -> {
+                            BlockCreator bc = cg.createMethod();
+
                             // Just create a new instance of the generated class
-                            mc.returnValue(
-                                    mc.newInstance(MethodDescriptor
-                                            .ofConstructor(generatedImplementations.get(entry.getValue().toString()))));
+                            bc.return_(bc.new_(ConstructorDesc.of(
+                                    generatedImplementations.get(entry.getValue().toString()))));
                         }).done();
             }
         }
@@ -721,12 +730,12 @@ public class MessageBundleProcessor {
         }
     }
 
-    private Map<String, String> generateImplementations(List<MessageBundleBuildItem> bundles,
+    private Map<String, ClassDesc> generateImplementations(List<MessageBundleBuildItem> bundles,
             BuildProducer<GeneratedClassBuildItem> generatedClasses,
             BuildProducer<MessageBundleMethodBuildItem> messageTemplateMethods,
             IndexView index) throws IOException {
 
-        Map<String, String> generatedTypes = new HashMap<>();
+        Map<String, ClassDesc> generatedTypes = new HashMap<>();
 
         ClassOutput defaultClassOutput = new GeneratedClassGizmoAdaptor(generatedClasses, new AppClassPredicate());
 
@@ -741,7 +750,7 @@ public class MessageBundleProcessor {
             // Generate implementation for the default bundle interface
             String bundleImpl = generateImplementation(bundle, null, null, bundleInterfaceWrapper,
                     defaultClassOutput, messageTemplateMethods, defaultKeyToMap, null, index);
-            generatedTypes.put(bundleInterface.name().toString(), bundleImpl);
+            generatedTypes.put(bundleInterface.name().toString(), ClassDesc.of(bundleImpl));
 
             // Generate imeplementation for each localized interface
             for (Entry<String, ClassInfo> entry : bundle.getLocalizedInterfaces().entrySet()) {
@@ -754,8 +763,8 @@ public class MessageBundleProcessor {
                         keyToMap);
 
                 generatedTypes.put(entry.getValue().name().toString(),
-                        generateImplementation(bundle, bundleInterface, bundleImpl, localizedInterfaceWrapper,
-                                defaultClassOutput, messageTemplateMethods, keyToMap, null, index));
+                        ClassDesc.of(generateImplementation(bundle, bundleInterface, bundleImpl, localizedInterfaceWrapper,
+                                defaultClassOutput, messageTemplateMethods, keyToMap, null, index)));
             }
 
             // Generate implementation for each localized file
@@ -776,8 +785,9 @@ public class MessageBundleProcessor {
                             }
                         }));
                 generatedTypes.put(localizedFile.toString(),
-                        generateImplementation(bundle, bundleInterface, bundleImpl, new SimpleClassInfoWrapper(bundleInterface),
-                                localeAwareGizmoAdaptor, messageTemplateMethods, keyToTemplate, locale, index));
+                        ClassDesc.of(generateImplementation(bundle, bundleInterface, bundleImpl,
+                                new SimpleClassInfoWrapper(bundleInterface), localeAwareGizmoAdaptor, messageTemplateMethods,
+                                keyToTemplate, locale, index)));
             }
         }
         return generatedTypes;
