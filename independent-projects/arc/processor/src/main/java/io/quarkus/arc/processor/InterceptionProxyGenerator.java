@@ -364,6 +364,31 @@ public class InterceptionProxyGenerator extends AbstractGenerator {
 
                     // Instantiate the forwarding function
                     // BiFunction<Object, InvocationContext, Object> forward = (target, ctx) -> target.foo$$superforward((java.lang.String)ctx.getParameters()[0])
+                    Expr forwardFunArg = bc.newAnonymousClass(BiFunction.class, acc -> {
+                        acc.method("apply", amc -> {
+                            ParamVar target = amc.parameter("target", Object.class);
+                            ParamVar ctx = amc.parameter("ctx", Object.class);
+                            amc.returning(Object.class);
+                            amc.body(abc -> {
+                                Expr[] superArgs;
+                                if (parameters.isEmpty()) {
+                                    superArgs = new Expr[0];
+                                } else {
+                                    Expr ctxArgs = abc.localVar("args", abc.invokeInterface(
+                                            MethodDesc.of(InvocationContext.class, "getParameters", Object[].class), ctx));
+                                    superArgs = new Expr[parameters.size()];
+                                    for (int i = 0; i < parameters.size(); i++) {
+                                        superArgs[i] = ctxArgs.elem(i);
+                                    }
+                                }
+                                Expr superResult = isInterface
+                                        ? abc.invokeInterface(methodDesc, target, superArgs)
+                                        : abc.invokeVirtual(methodDesc, target, superArgs);
+                                abc.return_(superResult);
+                            });
+                        });
+                    });
+/*
                     Expr forwardFunArg = bc.lambda(BiFunction.class, lc -> {
                         ParamVar target = lc.parameter("target", 0);
                         ParamVar ctx = lc.parameter("ctx", 1);
@@ -385,6 +410,7 @@ public class InterceptionProxyGenerator extends AbstractGenerator {
                             lbc.return_(superResult);
                         });
                     });
+*/
 
                     // Now create metadata for the given intercepted method
                     Expr methodMetadata = bc.new_(MethodDescs.INTERCEPTED_METHOD_METADATA_CONSTRUCTOR,

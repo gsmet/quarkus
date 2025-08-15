@@ -187,6 +187,23 @@ public class ComponentsProviderGenerator extends AbstractGenerator {
                     // Supplier<Collection<RemovedBean>>
                     LocalVar removedBeansSupplier;
                     if (detectUnusedFalsePositives) {
+                        removedBeansSupplier = bc.localVar("removedBeansSupplier", bc.newAnonymousClass(Supplier.class, acc -> {
+                            acc.method("get", amc -> {
+                                amc.returning(Object.class);
+                                amc.body(abc -> {
+                                    LocalVar removedBeans = abc.localVar("removedBeans", abc.new_(ArrayList.class));
+                                    LocalVar typeCache = abc.localVar("typeCache", abc.new_(HashMap.class));
+                                    // Break removed beans processing into multiple addRemovedBeans() methods
+                                    for (RemovedBeanGroup group : info.removedBeans()) {
+                                        ClassMethodDesc desc = ClassMethodDesc.of(cc.type(), ADD_REMOVED_BEANS + group.id(),
+                                                void.class, List.class, Map.class);
+                                        abc.invokeStatic(desc, removedBeans, typeCache);
+                                    }
+                                    abc.return_(removedBeans);
+                                });
+                            });
+                        }));
+/*
                         removedBeansSupplier = bc.localVar("removedBeansSupplier", bc.lambda(Supplier.class, lc -> {
                             lc.body(lbc -> {
                                 LocalVar removedBeans = lbc.localVar("removedBeans", lbc.new_(ArrayList.class));
@@ -200,6 +217,7 @@ public class ComponentsProviderGenerator extends AbstractGenerator {
                                 lbc.return_(removedBeans);
                             });
                         }));
+*/
                         generateAddRemovedBeans(cc, info);
                     } else {
                         removedBeansSupplier = bc.localVar("removedBeansSupplier",
@@ -230,11 +248,21 @@ public class ComponentsProviderGenerator extends AbstractGenerator {
                     } else {
                         LocalVar contextInstancesFinal = bc.localVar("contextInstances", bc.new_(HashMap.class));
                         scopeToContextInstances.forEach((scopeClass, contextClass) -> {
+                            Expr contextSupplier = bc.newAnonymousClass(Supplier.class, acc -> {
+                                acc.method("get", amc -> {
+                                    amc.returning(Object.class);
+                                    amc.body(abc -> {
+                                        abc.return_(abc.new_(ConstructorDesc.of(ClassDesc.of(contextClass))));
+                                    });
+                                });
+                            });
+/*
                             Expr contextSupplier = bc.lambda(Supplier.class, lc -> {
                                 lc.body(lbc -> {
                                     lbc.return_(lbc.new_(ConstructorDesc.of(ClassDesc.of(contextClass))));
                                 });
                             });
+*/
                             bc.withMap(contextInstancesFinal).put(Const.of(classDescOf(scopeClass)), contextSupplier);
                         });
                         contextInstances = contextInstancesFinal;
@@ -384,7 +412,7 @@ public class ComponentsProviderGenerator extends AbstractGenerator {
     private void generateAddRemovedBeans(ClassCreator cc, CodeGenInfo info) {
         for (RemovedBeanGroup group : info.removedBeans()) {
             cc.staticMethod(ADD_REMOVED_BEANS + group.id(), mc -> {
-                mc.private_();
+                mc.public_(); // to allow access from an anonymous class
                 mc.returning(void.class);
                 ParamVar rtRemovedBeans = mc.parameter("removedBeans", List.class);
                 ParamVar typeCacheMap = mc.parameter("typeCache", Map.class);

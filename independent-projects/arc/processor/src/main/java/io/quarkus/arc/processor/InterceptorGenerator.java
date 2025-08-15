@@ -212,6 +212,19 @@ public class InterceptorGenerator extends BeanGenerator {
 
         LocalVar list = bc.localVar(fieldDesc.name(), bc.new_(ArrayList.class));
         for (MethodInfo method : methods) {
+            Expr bifunc = bc.newAnonymousClass(BiFunction.class, acc -> {
+                acc.method("apply", amc -> {
+                    ParamVar interceptor = amc.parameter("interceptor", Object.class);
+                    ParamVar invocationContext = amc.parameter("invocationContext", Object.class);
+                    amc.returning(Object.class);
+                    amc.body(abc -> {
+                        Expr result = invokeInterceptorMethod(abc, interceptorClass, method, interceptionType,
+                                isApplicationClass, invocationContext, interceptor);
+                        abc.return_(interceptionType == InterceptionType.AROUND_INVOKE ? result : Const.ofNull(Object.class));
+                    });
+                });
+            });
+/*
             Expr bifunc = bc.lambda(BiFunction.class, lc -> {
                 ParamVar interceptor = lc.parameter("interceptor", 0);
                 ParamVar invocationContext = lc.parameter("invocationContext", 1);
@@ -221,6 +234,7 @@ public class InterceptorGenerator extends BeanGenerator {
                     lbc.return_(interceptionType == InterceptionType.AROUND_INVOKE ? result : Const.ofNull(Object.class));
                 });
             });
+*/
             bc.withList(list).add(bifunc);
         }
         bc.set(cc.this_().field(fieldDesc), list);

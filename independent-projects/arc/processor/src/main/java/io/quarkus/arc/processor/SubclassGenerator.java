@@ -277,6 +277,38 @@ public class SubclassGenerator extends AbstractGenerator {
                         LocalVar aroundInvokes = bc.localVar("aroundInvokes", bc.new_(ArrayList.class));
                         for (MethodInfo method : bean.getAroundInvokes()) {
                             // BiFunction<Object,InvocationContext,Object>
+                            Expr lambda = bc.newAnonymousClass(BiFunction.class, acc -> {
+                                acc.method("apply", amc -> {
+                                    ParamVar target = amc.parameter("target", Object.class);
+                                    ParamVar ctx = amc.parameter("ctx", Object.class);
+                                    amc.returning(Object.class);
+                                    amc.body(abc -> {
+                                        boolean isApplicationClass = applicationClassPredicate.test(bean.getBeanClass());
+                                        // Check if interceptor method uses InvocationContext or ArcInvocationContext
+                                        Class<?> invocationContextClass;
+                                        if (method.parameterType(0).name().equals(DotNames.INVOCATION_CONTEXT)) {
+                                            invocationContextClass = InvocationContext.class;
+                                        } else {
+                                            invocationContextClass = ArcInvocationContext.class;
+                                        }
+                                        if (Modifier.isPrivate(method.flags())) {
+                                            // Use reflection fallback
+                                            privateMembers.add(isApplicationClass, String.format("Interceptor method %s#%s()",
+                                                    method.declaringClass().name(), method.name()));
+                                            reflectionRegistration.registerMethod(method);
+                                            Expr paramTypes = abc.newArray(Class.class, Const.of(invocationContextClass));
+                                            Expr argValues = abc.newArray(Object.class, ctx);
+                                            abc.return_(abc.invokeStatic(MethodDescs.REFLECTIONS_INVOKE_METHOD,
+                                                    Const.of(classDescOf(method.declaringClass())), Const.of(method.name()),
+                                                    paramTypes, target, argValues));
+                                        } else {
+                                            abc.return_(abc.invokeVirtual(methodDescOf(method),
+                                                    abc.cast(target, classDescOf(method.declaringClass())), ctx));
+                                        }
+                                    });
+                                });
+                            });
+/*
                             Expr lambda = bc.lambda(BiFunction.class, lc -> {
                                 ParamVar target = lc.parameter("target", 0);
                                 ParamVar ctx = lc.parameter("ctx", 1);
@@ -305,6 +337,7 @@ public class SubclassGenerator extends AbstractGenerator {
                                     }
                                 });
                             });
+*/
                             bc.withList(aroundInvokes).add(lambda);
                         }
                         bc.set(cc.this_().field(aroundInvokesField), aroundInvokes);
@@ -428,6 +461,56 @@ public class SubclassGenerator extends AbstractGenerator {
 
                         // Instantiate the forwarding function
                         // BiFunction<Object, InvocationContext, Object> forward = (target, ctx) -> target.foo$$superforward((java.lang.String)ctx.getParameters()[0])
+                        LocalVar forwardFun = bc.localVar("forwardFun", bc.newAnonymousClass(BiFunction.class, acc -> {
+                            Var capturedDecorator = decorator != null ? acc.capture(decorator) : null;
+                            acc.method("apply", amc -> {
+                                ParamVar target = amc.parameter("target", Object.class);
+                                ParamVar ctx = amc.parameter("ctx", Object.class);
+                                amc.returning(Object.class);
+                                amc.body(abc -> {
+                                    MethodDesc desc;
+                                    Expr instance;
+                                    if (decoratorMethod == null) {
+                                        desc = forwardDesc;
+                                        instance = target;
+                                    } else {
+                                        // If a decorator is bound then invoke the method upon the decorator instance instead of the generated forwarding method
+                                        ClassDesc declaringClass = classDescOf(decoratorMethod.decorator.getBeanClass());
+                                        if (decoratorMethod.decorator.isAbstract()) {
+                                            String baseName = decoratorMethod.decorator.getTarget().get().asClass()
+                                                    .name().withoutPackagePrefix();
+                                            String targetPackage = DotNames.packagePrefix(
+                                                    decoratorMethod.decorator.getProviderType().name());
+                                            String generatedName = generatedNameFromTarget(targetPackage, baseName,
+                                                    DecoratorGenerator.ABSTRACT_IMPL_SUFFIX);
+                                            declaringClass = ClassDesc.of(generatedName);
+                                        }
+                                        // We need to use the decorator method in order to support generic decorators
+                                        MethodDesc decoratorMethodDesc = methodDescOf(decoratorMethod.method);
+                                        // always a class, decorators cannot be interfaces
+                                        desc = ClassMethodDesc.of(declaringClass, methodDesc.name(),
+                                                decoratorMethodDesc.type());
+                                        instance = capturedDecorator;
+                                    }
+
+                                    Expr[] superArgs;
+                                    if (parameters.isEmpty()) {
+                                        superArgs = new Expr[0];
+                                    } else {
+                                        Expr ctxArgs = abc.localVar("args", abc.invokeInterface(
+                                                MethodDescs.INVOCATION_CONTEXT_GET_PARAMETERS, ctx));
+                                        superArgs = new Expr[parameters.size()];
+                                        for (int i = 0; i < parameters.size(); i++) {
+                                            superArgs[i] = ctxArgs.elem(i);
+                                        }
+                                    }
+
+                                    Expr superResult = abc.invokeVirtual(desc, instance, superArgs);
+                                    abc.return_(superResult.isVoid() ? Const.ofNull(Object.class) : superResult);
+                                });
+                            });
+                        }));
+/*
                         LocalVar forwardFun = bc.localVar("forwardFun", bc.lambda(BiFunction.class, lc -> {
                             Var capturedDecorator = decorator != null ? lc.capture(decorator) : null;
                             ParamVar target = lc.parameter("target", 0);
@@ -473,10 +556,26 @@ public class SubclassGenerator extends AbstractGenerator {
                                 lbc.return_(superResult.isVoid() ? Const.ofNull(Object.class) : superResult);
                             });
                         }));
+*/
 
                         if (bean.hasAroundInvokes()) {
                             LocalVar finalForwardFun = forwardFun;
                             // Wrap the forwarding function with a function that calls around invoke methods declared in a hierarchy of the target class first
+                            forwardFun = bc.localVar("forwardFun2", bc.newAnonymousClass(BiFunction.class, acc -> {
+                                Var capturedAroundInvokes = acc.capture(cc.this_().field(aroundInvokesField));
+                                Var capturedForwardFun = acc.capture(finalForwardFun);
+                                acc.method("apply", amc -> {
+                                    ParamVar target = amc.parameter("target", Object.class); // unused
+                                    ParamVar ctx = amc.parameter("ctx", Object.class);
+                                    amc.returning(Object.class);
+                                    amc.body(abc -> {
+                                        abc.return_(
+                                                abc.invokeStatic(MethodDescs.INVOCATION_CONTEXTS_PERFORM_TARGET_AROUND_INVOKE,
+                                                        ctx, capturedAroundInvokes, capturedForwardFun));
+                                    });
+                                });
+                            }));
+/*
                             forwardFun = bc.localVar("forwardFun2", bc.lambda(BiFunction.class, lc -> {
                                 Var capturedAroundInvokes = lc.capture(cc.this_().field(aroundInvokesField));
                                 Var capturedForwardFun = lc.capture(finalForwardFun);
@@ -487,6 +586,7 @@ public class SubclassGenerator extends AbstractGenerator {
                                             ctx, capturedAroundInvokes, capturedForwardFun));
                                 });
                             }));
+*/
                         }
 
                         // Now create metadata for the given intercepted method

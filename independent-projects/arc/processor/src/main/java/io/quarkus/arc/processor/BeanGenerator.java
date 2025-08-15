@@ -680,6 +680,42 @@ public class BeanGenerator extends AbstractGenerator {
 
             // Forwarding function
             // Function<Object[], Object> forward = (params) -> new SimpleBean_Subclass(params[0], ctx, lifecycleInterceptorProvider1)
+            LocalVar func = bc.localVar("func", bc.newAnonymousClass(Function.class, acc -> {
+                List<Var> capturedAllOtherCtorParams = new ArrayList<>();
+                for (int i = 0; i < allOtherCtorParams.size(); i++) {
+                    Var param = allOtherCtorParams.get(i);
+                    capturedAllOtherCtorParams.add(acc.capture(param.name() + i, param));
+                }
+                Var capturedParentCC = acc.capture(parentCC);
+                List<TransientReference> capturedTransientReferences = transientReferences.stream()
+                        .map(it -> new TransientReference(
+                                acc.capture(it.provider), acc.capture(it.instance), acc.capture(it.creationalContext)))
+                        .toList();
+                acc.method("apply", amc -> {
+                    ParamVar params = amc.parameter("params", Object.class);
+                    amc.returning(Object.class);
+                    amc.body(abc -> {
+                        List<LocalVar> args = new ArrayList<>();
+                        if (!injectableCtorParams.isEmpty()) {
+                            // `injectableCtorParams` are passed to the first interceptor in the chain
+                            // the `Function` generated here obtains the parameter array from `InvocationContext`
+                            // these 2 arrays have the same shape (size and element types), but not necessarily the same content
+                            LocalVar paramsArray = abc.localVar("params", abc.cast(params, Object[].class));
+                            for (int i = 0; i < injectableCtorParams.size(); i++) {
+                                args.add(abc.localVar("arg" + i, paramsArray.elem(i)));
+                            }
+                        }
+                        List<Var> providers = new ArrayList<>(args);
+                        providers.addAll(capturedAllOtherCtorParams);
+                        LocalVar result = abc.localVar("result", newBeanInstance(bean, abc, providerType, baseName,
+                                providers, isApplicationClass, capturedParentCC));
+                        // Destroy injected transient references
+                        destroyTransientReferences(abc, capturedTransientReferences);
+                        abc.return_(result);
+                    });
+                });
+            }));
+/*
             LocalVar func = bc.localVar("func", bc.lambda(Function.class, lc -> {
                 List<Var> capturedAllOtherCtorParams = new ArrayList<>();
                 for (int i = 0; i < allOtherCtorParams.size(); i++) {
@@ -712,6 +748,7 @@ public class BeanGenerator extends AbstractGenerator {
                     lbc.return_(result);
                 });
             }));
+*/
 
             // Interceptor bindings
             LocalVar bindingsArray = bc.localVar("bindings",
@@ -908,6 +945,16 @@ public class BeanGenerator extends AbstractGenerator {
             //     var12.proceed();
             //     return var7;
             // }
+            LocalVar runnable = bc.localVar("runnable", bc.newAnonymousClass(Runnable.class, acc -> {
+                Var capturedInstance = acc.capture("instance", instance);
+                acc.method("run", amc -> {
+                    amc.body(abc -> {
+                        new PostConstructGenerator().generate(abc, capturedInstance);
+                        abc.return_();
+                    });
+                });
+            }));
+/*
             LocalVar runnable = bc.localVar("runnable", bc.lambda(Runnable.class, lc -> {
                 Var capturedInstance = lc.capture("instance", instance);
                 lc.body(lbc -> {
@@ -915,6 +962,7 @@ public class BeanGenerator extends AbstractGenerator {
                     lbc.return_();
                 });
             }));
+*/
 
             // Interceptor bindings
             LocalVar bindingsArray = bc.localVar("bindings",
@@ -1535,6 +1583,16 @@ public class BeanGenerator extends AbstractGenerator {
                                     //     ((MyBean_Subclass)var1).arc$destroy((Runnable)var3);
                                     //     var2.release();
                                     // }
+                                    Expr runnable = b1.newAnonymousClass(Runnable.class, acc -> {
+                                        Var capturedInstance = acc.capture(instance);
+                                        acc.method("run", amc -> {
+                                            amc.body(abc -> {
+                                                new PreDestroyGenerator().generate(abc, capturedInstance);
+                                                abc.return_();
+                                            });
+                                        });
+                                    });
+/*
                                     Expr runnable = b1.lambda(Runnable.class, lc -> {
                                         Var capturedInstance = lc.capture(instance);
                                         lc.body(lbc -> {
@@ -1542,6 +1600,7 @@ public class BeanGenerator extends AbstractGenerator {
                                             lbc.return_();
                                         });
                                     });
+*/
 
                                     b1.invokeVirtual(ClassMethodDesc.of(subclass, SubclassGenerator.DESTROY_METHOD_NAME,
                                             void.class, Runnable.class), instance, runnable);
