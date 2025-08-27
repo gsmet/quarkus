@@ -16,11 +16,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import jakarta.enterprise.context.spi.Contextual;
@@ -111,14 +109,14 @@ public class InvokerGenerator extends AbstractGenerator {
         }
 
         gizmo.class_(invoker.lazyClassName, cc -> {
-            cc.implements_(Invoker.class);
+            cc.implements_(ArcGenericTypes.INVOKER);
 
             cc.defaultConstructor();
 
             cc.method("invoke", mc -> {
-                mc.returning(Object.class);
-                ParamVar instance = mc.parameter("instance", Object.class);
-                ParamVar arguments = mc.parameter("arguments", Object[].class);
+                mc.returning(ArcGenericTypes.OBJECT);
+                ParamVar instance = mc.parameter("instance", ArcGenericTypes.OBJECT);
+                ParamVar arguments = mc.parameter("arguments", ArcGenericTypes.OBJECT_ARRAY);
                 mc.body(bc -> {
                     ClassDesc invokerClass = invoker.wrapperClassName != null
                             ? ClassDesc.of(invoker.wrapperClassName)
@@ -141,12 +139,12 @@ public class InvokerGenerator extends AbstractGenerator {
         }
 
         gizmo.class_(invoker.wrapperClassName, cc -> {
-            cc.implements_(Invoker.class);
+            cc.implements_(ArcGenericTypes.INVOKER);
 
             FieldDesc delegate = cc.field("delegate", fc -> {
                 fc.private_();
                 fc.final_();
-                fc.setType(Invoker.class);
+                fc.setType(ArcGenericTypes.INVOKER);
             });
 
             ConstructorDesc ctor = cc.constructor(mc -> {
@@ -159,9 +157,9 @@ public class InvokerGenerator extends AbstractGenerator {
             });
 
             cc.method("invoke", mc -> {
-                mc.returning(Object.class);
-                ParamVar instance = mc.parameter("instance", Object.class);
-                ParamVar arguments = mc.parameter("arguments", Object[].class);
+                mc.returning(ArcGenericTypes.OBJECT);
+                ParamVar instance = mc.parameter("instance", ArcGenericTypes.OBJECT);
+                ParamVar arguments = mc.parameter("arguments", ArcGenericTypes.OBJECT_ARRAY);
                 mc.body(bc -> {
                     MethodInfo wrappingMethod = findWrapper(invoker);
                     Expr result = bc.invokeStatic(methodDescOf(wrappingMethod), instance, arguments,
@@ -254,7 +252,7 @@ public class InvokerGenerator extends AbstractGenerator {
         CodeGenInfo info = preprocess(invoker);
 
         gizmo.class_(invoker.className, cc -> {
-            cc.implements_(Invoker.class);
+            cc.implements_(ArcGenericTypes.INVOKER);
 
             FieldDesc instanceSupplier;
             FieldDesc[] argumentSuppliers = new FieldDesc[invoker.method.parametersCount()];
@@ -262,7 +260,7 @@ public class InvokerGenerator extends AbstractGenerator {
                 instanceSupplier = cc.field("instance", fc -> {
                     fc.private_();
                     fc.final_();
-                    fc.setType(Supplier.class);
+                    fc.setType(ArcGenericTypes.SUPPLIER);
                 });
             } else {
                 instanceSupplier = null;
@@ -272,7 +270,7 @@ public class InvokerGenerator extends AbstractGenerator {
                     argumentSuppliers[i] = cc.field("arg" + i, fc -> {
                         fc.private_();
                         fc.final_();
-                        fc.setType(Supplier.class);
+                        fc.setType(ArcGenericTypes.SUPPLIER);
                     });
                 }
             }
@@ -311,9 +309,9 @@ public class InvokerGenerator extends AbstractGenerator {
             });
 
             cc.method("invoke", mc -> {
-                mc.returning(Object.class);
-                ParamVar instanceParam = mc.parameter("instance", Object.class);
-                ParamVar argumentsParam = mc.parameter("arguments", Object[].class);
+                mc.returning(ArcGenericTypes.OBJECT);
+                ParamVar instanceParam = mc.parameter("instance", ArcGenericTypes.OBJECT);
+                ParamVar argumentsParam = mc.parameter("arguments", ArcGenericTypes.OBJECT_ARRAY);
                 mc.body(b0 -> {
                     LocalVar cleanupTasks = info.usesCleanupTasks
                             ? b0.localVar("cleanupTasks", b0.new_(InvokerCleanupTasks.class))
@@ -476,23 +474,19 @@ public class InvokerGenerator extends AbstractGenerator {
         StaticFieldVar instance = cc.staticField("INSTANCE", fc -> {
             fc.private_();
             fc.final_();
-            fc.setType(AtomicReference.class);
+            fc.setType(ArcGenericTypes.ATOMIC_REFERENCE);
             fc.setInitializer(bc -> {
-                bc.yield(bc.new_(AtomicReference.class));
+                bc.yield(bc.new_(ArcGenericTypes.ATOMIC_REFERENCE));
             });
         });
 
-        MethodDesc atomicReferenceGet = MethodDesc.of(AtomicReference.class, "get", Object.class);
-        MethodDesc atomicReferenceCAS = MethodDesc.of(AtomicReference.class, "compareAndSet", boolean.class,
-                Object.class, Object.class);
-
         cc.staticMethod("get", mc -> {
-            mc.returning(Invoker.class);
+            mc.returning(ArcGenericTypes.INVOKER);
             mc.body(b0 -> {
-                LocalVar result = b0.localVar("result", b0.invokeVirtual(atomicReferenceGet, instance));
+                LocalVar result = b0.localVar("result", b0.invokeVirtual(MethodDescs.ATOMIC_REFERENCE_GET, instance));
                 b0.ifNull(result, b1 -> {
-                    b1.invokeVirtual(atomicReferenceCAS, instance, Const.ofNull(Invoker.class), b1.new_(ctor));
-                    b1.set(result, b1.invokeVirtual(atomicReferenceGet, instance));
+                    b1.invokeVirtual(MethodDescs.ATOMIC_REFERENCE_CAS, instance, Const.ofNull(Invoker.class), b1.new_(ctor));
+                    b1.set(result, b1.invokeVirtual(MethodDescs.ATOMIC_REFERENCE_GET, instance));
                 });
                 b0.return_(result);
             });

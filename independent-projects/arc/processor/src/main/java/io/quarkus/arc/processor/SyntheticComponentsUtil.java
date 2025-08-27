@@ -40,7 +40,7 @@ final class SyntheticComponentsUtil {
         FieldDesc paramsField = cc.field(FIELD_NAME_PARAMS, fc -> {
             fc.private_();
             fc.final_();
-            fc.setType(Map.class);
+            fc.setType(ArcGenericTypes.MAP);
         });
 
         LocalVar tccl = bc.localVar("tccl", bc.invokeVirtual(MethodDescs.THREAD_GET_TCCL, bc.currentThread()));

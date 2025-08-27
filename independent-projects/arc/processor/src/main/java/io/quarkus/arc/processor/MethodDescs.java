@@ -9,6 +9,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 import java.util.concurrent.locks.Lock;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -90,6 +92,14 @@ public final class MethodDescs {
     public static final MethodDesc OBJECT_GET_CLASS = MethodDesc.of(Object.class, "getClass", Class.class);
 
     public static final ConstructorDesc OBJECT_CONSTRUCTOR = ConstructorDesc.of(Object.class);
+
+    public static final MethodDesc ATOMIC_REFERENCE_FIELD_UPDATER_NEW_UPDATER = MethodDesc.of(AtomicReferenceFieldUpdater.class,
+            "newUpdater",
+            AtomicReferenceFieldUpdater.class, Class.class, Class.class, String.class);
+
+    public static final MethodDesc ATOMIC_REFERENCE_GET = MethodDesc.of(AtomicReference.class, "get", Object.class);
+    public static final MethodDesc ATOMIC_REFERENCE_CAS = MethodDesc.of(AtomicReference.class, "compareAndSet", boolean.class,
+            Object.class, Object.class);
 
     public static final MethodDesc INTERCEPTOR_INVOCATION_POST_CONSTRUCT = MethodDesc.of(InterceptorInvocation.class,
             "postConstruct", InterceptorInvocation.class, InjectableInterceptor.class, Object.class);

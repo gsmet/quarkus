@@ -16,7 +16,6 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
 import jakarta.enterprise.context.spi.CreationalContext;
@@ -29,14 +28,12 @@ import org.jboss.jandex.IndexView;
 import org.jboss.jandex.MethodInfo;
 import org.jboss.jandex.Type;
 
-import io.quarkus.arc.InjectableReferenceProvider;
-import io.quarkus.arc.InterceptionProxy;
-import io.quarkus.arc.InterceptionProxySubclass;
 import io.quarkus.arc.impl.InterceptedMethodMetadata;
 import io.quarkus.arc.processor.ResourceOutput.Resource;
 import io.quarkus.arc.processor.SubclassGenerator.IntegerHolder;
 import io.quarkus.gizmo2.Const;
 import io.quarkus.gizmo2.Expr;
+import io.quarkus.gizmo2.GenericTypes;
 import io.quarkus.gizmo2.Gizmo;
 import io.quarkus.gizmo2.LocalVar;
 import io.quarkus.gizmo2.ParamVar;
@@ -103,23 +100,23 @@ public class InterceptionProxyGenerator extends AbstractGenerator {
 
     private void createInterceptionProxyProvider(Gizmo gizmo, BeanInfo bean) {
         gizmo.class_(interceptionProxyProviderName(bean), cc -> {
-            cc.implements_(Supplier.class);
-            cc.implements_(InjectableReferenceProvider.class);
+            cc.implements_(ArcGenericTypes.SUPPLIER);
+            cc.implements_(ArcGenericTypes.INJECTABLE_REFERENCE_PROVIDER);
 
             cc.defaultConstructor();
 
             // Supplier
             cc.method("get", mc -> {
                 mc.public_();
-                mc.returning(Object.class);
+                mc.returning(ArcGenericTypes.OBJECT);
                 mc.body(bc -> bc.return_(cc.this_()));
             });
 
             // InjectableReferenceProvider
             cc.method("get", mc -> {
                 mc.public_();
-                mc.returning(Object.class);
-                ParamVar creationalContext = mc.parameter("creationalContext", CreationalContext.class);
+                mc.returning(ArcGenericTypes.OBJECT);
+                ParamVar creationalContext = mc.parameter("creationalContext", ArcGenericTypes.CREATIONAL_CONTEXT);
                 mc.body(bc -> {
                     ConstructorDesc ctor = ConstructorDesc.of(ClassDesc.of(interceptionProxyName(bean)),
                             ClassDesc.of(CreationalContext.class.getName()));
@@ -131,17 +128,17 @@ public class InterceptionProxyGenerator extends AbstractGenerator {
 
     private void createInterceptionProxy(Gizmo gizmo, BeanInfo bean) {
         gizmo.class_(interceptionProxyName(bean), cc -> {
-            cc.implements_(InterceptionProxy.class);
+            cc.implements_(ArcGenericTypes.INTERCEPTION_PROXY);
 
             FieldDesc ccField = cc.field("creationalContext", fc -> {
                 fc.private_();
                 fc.final_();
-                fc.setType(CreationalContext.class);
+                fc.setType(ArcGenericTypes.CREATIONAL_CONTEXT);
             });
 
             cc.constructor(mc -> {
                 mc.public_();
-                ParamVar ccParam = mc.parameter("creationalContext", CreationalContext.class);
+                ParamVar ccParam = mc.parameter("creationalContext", ArcGenericTypes.CREATIONAL_CONTEXT);
                 mc.body(bc -> {
                     bc.invokeSpecial(ConstructorDesc.of(Object.class), cc.this_());
                     bc.set(cc.this_().field(ccField), ccParam);
@@ -151,8 +148,8 @@ public class InterceptionProxyGenerator extends AbstractGenerator {
 
             cc.method("create", mc -> {
                 mc.public_();
-                mc.returning(Object.class);
-                ParamVar delegate = mc.parameter("delegate", Object.class);
+                mc.returning(ArcGenericTypes.OBJECT);
+                ParamVar delegate = mc.parameter("delegate", ArcGenericTypes.OBJECT);
                 mc.body(b0 -> {
                     InterceptionProxyInfo interceptionProxy = bean.getInterceptionProxy();
                     b0.ifInstanceOf(delegate, classDescOf(interceptionProxy.getTargetClass()), (b1, ignored) -> {
@@ -188,7 +185,7 @@ public class InterceptionProxyGenerator extends AbstractGenerator {
             if (isInterface) {
                 cc.implements_(pseudoBeanClass);
             }
-            cc.implements_(InterceptionProxySubclass.class);
+            cc.implements_(ArcGenericTypes.INTERCEPTION_PROXY_SUBCLASS);
 
             FieldDesc delegateField = cc.field("delegate", fc -> {
                 fc.private_();
@@ -199,7 +196,7 @@ public class InterceptionProxyGenerator extends AbstractGenerator {
             FieldDesc constructedField = cc.field(SubclassGenerator.FIELD_NAME_CONSTRUCTED, fc -> {
                 fc.private_();
                 fc.final_();
-                fc.setType(boolean.class);
+                fc.setType(GenericTypes.GT_boolean);
             });
 
             Map<List<InterceptorInfo>, String> interceptorChainKeys = new HashMap<>();
@@ -219,8 +216,8 @@ public class InterceptionProxyGenerator extends AbstractGenerator {
 
             cc.constructor(mc -> {
                 mc.public_();
-                ParamVar ccParam = mc.parameter("creationalContext", CreationalContext.class);
-                ParamVar delegateParam = mc.parameter("delegate", Object.class);
+                ParamVar ccParam = mc.parameter("creationalContext", ArcGenericTypes.CREATIONAL_CONTEXT);
+                ParamVar delegateParam = mc.parameter("delegate", ArcGenericTypes.OBJECT);
                 mc.body(bc -> {
                     bc.invokeSpecial(ConstructorDesc.of(superClass), cc.this_());
 
@@ -261,7 +258,7 @@ public class InterceptionProxyGenerator extends AbstractGenerator {
                         // Each intercepted method has a corresponding InterceptedMethodMetadata field
                         cc.field("arc$" + interceptedMethod.index, fc -> {
                             fc.private_();
-                            fc.setType(InterceptedMethodMetadata.class);
+                            fc.setType(ArcGenericTypes.INTERCEPTED_METHOD_METADATA);
                         });
                         interceptorChainKeys.computeIfAbsent(interception.interceptors, interceptorChainKeysFun);
                         bindingKeys.computeIfAbsent(interception.bindingsEquivalenceProxies(), bindingsFun);
@@ -287,7 +284,7 @@ public class InterceptionProxyGenerator extends AbstractGenerator {
 
             cc.method("arc_delegate", mc -> {
                 mc.public_();
-                mc.returning(Object.class);
+                mc.returning(ArcGenericTypes.OBJECT);
                 mc.body(bc -> bc.return_(cc.this_().field(delegateField)));
             });
 
@@ -318,9 +315,9 @@ public class InterceptionProxyGenerator extends AbstractGenerator {
 
         cc.method("arc$initMetadata" + group.id(), mc -> {
             mc.private_();
-            mc.returning(void.class);
-            ParamVar interceptorChainMapParam = mc.parameter("interceptorChainMap", Map.class);
-            ParamVar bindingsMapParam = mc.parameter("bindingsMap", Map.class);
+            mc.returning(GenericTypes.GT_void);
+            ParamVar interceptorChainMapParam = mc.parameter("interceptorChainMap", ArcGenericTypes.MAP);
+            ParamVar bindingsMapParam = mc.parameter("bindingsMap", ArcGenericTypes.MAP);
             mc.body(bc -> {
                 // to avoid repeatedly looking for the exact same thing in the maps
                 Map<String, LocalVar> chains = new HashMap<>();
@@ -366,9 +363,9 @@ public class InterceptionProxyGenerator extends AbstractGenerator {
                     // BiFunction<Object, InvocationContext, Object> forward = (target, ctx) -> target.foo$$superforward((java.lang.String)ctx.getParameters()[0])
                     Expr forwardFunArg = bc.newAnonymousClass(BiFunction.class, acc -> {
                         acc.method("apply", amc -> {
-                            ParamVar target = amc.parameter("target", Object.class);
-                            ParamVar ctx = amc.parameter("ctx", Object.class);
-                            amc.returning(Object.class);
+                            ParamVar target = amc.parameter("target", ArcGenericTypes.OBJECT);
+                            ParamVar ctx = amc.parameter("ctx", ArcGenericTypes.OBJECT);
+                            amc.returning(ArcGenericTypes.OBJECT);
                             amc.body(abc -> {
                                 Expr[] superArgs;
                                 if (parameters.isEmpty()) {
@@ -419,7 +416,7 @@ public class InterceptionProxyGenerator extends AbstractGenerator {
                     FieldDesc metadataField = FieldDesc.of(cc.type(), "arc$" + interceptedMethod.index,
                             InterceptedMethodMetadata.class);
 
-                    bc.set(cc.this_().field(metadataField), methodMetadata);
+                    bc.set(cc.this_().field(metadataField, ArcGenericTypes.INTERCEPTED_METHOD_METADATA), methodMetadata);
 
                     // Needed when running on native image
                     reflectionRegistration.registerMethod(method);

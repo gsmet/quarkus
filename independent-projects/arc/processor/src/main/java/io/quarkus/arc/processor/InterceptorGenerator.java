@@ -15,7 +15,6 @@ import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
-import java.util.function.Supplier;
 
 import jakarta.enterprise.inject.spi.InterceptionType;
 import jakarta.interceptor.InvocationContext;
@@ -36,6 +35,7 @@ import io.quarkus.arc.processor.ResourceOutput.Resource.SpecialType;
 import io.quarkus.gizmo2.Const;
 import io.quarkus.gizmo2.Expr;
 import io.quarkus.gizmo2.FieldVar;
+import io.quarkus.gizmo2.GenericTypes;
 import io.quarkus.gizmo2.Gizmo;
 import io.quarkus.gizmo2.LocalVar;
 import io.quarkus.gizmo2.ParamVar;
@@ -119,18 +119,18 @@ public class InterceptorGenerator extends BeanGenerator {
     private void generateInterceptor(Gizmo gizmo, InterceptorInfo interceptor, String generatedName, String baseName,
             String targetPackage, boolean isApplicationClass) {
         gizmo.class_(generatedName, cc -> {
-            cc.implements_(InjectableInterceptor.class);
-            cc.implements_(Supplier.class);
+            cc.implements_(ArcGenericTypes.INJECTABLE_INTERCEPTOR);
+            cc.implements_(ArcGenericTypes.SUPPLIER);
 
             FieldDesc beanTypesField = cc.field(FIELD_NAME_BEAN_TYPES, fc -> {
                 fc.private_();
                 fc.final_();
-                fc.setType(Set.class);
+                fc.setType(ArcGenericTypes.SET);
             });
             FieldDesc bindingsField = cc.field(FIELD_NAME_BINDINGS, fc -> {
                 fc.private_();
                 fc.final_();
-                fc.setType(Set.class);
+                fc.setType(ArcGenericTypes.SET);
             });
             Map<InjectionPointInfo, FieldDesc> injectionPointToProviderField = new HashMap<>();
             generateProviderFields(interceptor, cc, injectionPointToProviderField, Map.of(), Map.of());
@@ -207,16 +207,16 @@ public class InterceptorGenerator extends BeanGenerator {
         FieldDesc fieldDesc = cc.field(interceptorMethodsField(interceptionType), fc -> {
             fc.private_();
             fc.final_();
-            fc.setType(List.class);
+            fc.setType(ArcGenericTypes.LIST);
         });
 
         LocalVar list = bc.localVar(fieldDesc.name(), bc.new_(ArrayList.class));
         for (MethodInfo method : methods) {
             Expr bifunc = bc.newAnonymousClass(BiFunction.class, acc -> {
                 acc.method("apply", amc -> {
-                    ParamVar interceptor = amc.parameter("interceptor", Object.class);
-                    ParamVar invocationContext = amc.parameter("invocationContext", Object.class);
-                    amc.returning(Object.class);
+                    ParamVar interceptor = amc.parameter("interceptor", ArcGenericTypes.OBJECT);
+                    ParamVar invocationContext = amc.parameter("invocationContext", ArcGenericTypes.OBJECT);
+                    amc.returning(ArcGenericTypes.OBJECT);
                     amc.body(abc -> {
                         Expr result = invokeInterceptorMethod(abc, interceptorClass, method, interceptionType,
                                 isApplicationClass, invocationContext, interceptor);
@@ -245,7 +245,7 @@ public class InterceptorGenerator extends BeanGenerator {
      */
     protected void generateGetBeanClass(ClassCreator cc, InterceptorInfo interceptor) {
         cc.method("getBeanClass", mc -> {
-            mc.returning(Class.class);
+            mc.returning(ArcGenericTypes.CLASS);
             mc.body(bc -> {
                 bc.return_(interceptor.isSynthetic()
                         ? Const.of(interceptor.getCreatorClass())
@@ -259,7 +259,7 @@ public class InterceptorGenerator extends BeanGenerator {
      */
     protected void generateGetInterceptorBindings(ClassCreator cc, FieldDesc bindingsField) {
         cc.method("getInterceptorBindings", mc -> {
-            mc.returning(Set.class);
+            mc.returning(ArcGenericTypes.SET);
             mc.body(bc -> {
                 bc.return_(cc.this_().field(bindingsField));
             });
@@ -271,8 +271,8 @@ public class InterceptorGenerator extends BeanGenerator {
      */
     protected void generateIntercepts(ClassCreator cc, InterceptorInfo interceptor) {
         cc.method("intercepts", mc -> {
-            mc.returning(boolean.class);
-            ParamVar interceptionType = mc.parameter("interceptionType", InterceptionType.class);
+            mc.returning(GenericTypes.GT_boolean);
+            ParamVar interceptionType = mc.parameter("interceptionType", ArcGenericTypes.INTERCEPTION_TYPE);
             mc.body(bc -> {
                 if (interceptor.isSynthetic()) {
                     FieldVar enumValue = Expr.staticField(FieldDesc.of(InterceptionType.class,
@@ -302,10 +302,10 @@ public class InterceptorGenerator extends BeanGenerator {
      */
     protected void generateIntercept(ClassCreator cc, InterceptorInfo interceptor, boolean isApplicationClass) {
         cc.method("intercept", mc -> {
-            mc.returning(Object.class);
-            ParamVar interceptionType = mc.parameter("interceptionType", InterceptionType.class);
-            ParamVar interceptorInstance = mc.parameter("interceptorInstance", Object.class);
-            ParamVar invocationContext = mc.parameter("invocationContext", InvocationContext.class);
+            mc.returning(ArcGenericTypes.OBJECT);
+            ParamVar interceptionType = mc.parameter("interceptionType", ArcGenericTypes.INTERCEPTION_TYPE);
+            ParamVar interceptorInstance = mc.parameter("interceptorInstance", ArcGenericTypes.OBJECT);
+            ParamVar invocationContext = mc.parameter("invocationContext", ArcGenericTypes.INVOCATION_CONTEXT);
             mc.body(b0 -> {
                 if (interceptor.isSynthetic()) {
                     b0.if_(b0.eq(Const.of(interceptor.getInterceptionType()), interceptionType), b1 -> {

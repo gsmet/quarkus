@@ -27,10 +27,6 @@ import org.jboss.jandex.IndexView;
 import org.jboss.jandex.MethodInfo;
 import org.jboss.jandex.Type;
 
-import io.quarkus.arc.ClientProxy;
-import io.quarkus.arc.InjectableBean;
-import io.quarkus.arc.InjectableContext;
-import io.quarkus.arc.impl.Mockable;
 import io.quarkus.arc.processor.Methods.MethodKey;
 import io.quarkus.arc.processor.ResourceOutput.Resource;
 import io.quarkus.arc.processor.ResourceOutput.Resource.SpecialType;
@@ -136,15 +132,15 @@ public class ClientProxyGenerator extends AbstractGenerator {
             } else {
                 cc.implements_(providerGenericType);
             }
-            cc.implements_(ClientProxy.class);
+            cc.implements_(ArcGenericTypes.CLIENT_PROXY);
             if (mockable) {
-                cc.implements_(Mockable.class);
+                cc.implements_(ArcGenericTypes.MOCKABLE);
             }
 
             FieldDesc beanField = cc.field(BEAN_FIELD, fc -> {
                 fc.private_();
                 fc.final_();
-                fc.setType(InjectableBean.class);
+                fc.setType(ArcGenericTypes.INJECTABLE_BEAN);
             });
 
             FieldDesc mockField;
@@ -165,14 +161,14 @@ public class ClientProxyGenerator extends AbstractGenerator {
                 contextField = cc.field(CONTEXT_FIELD, fc -> {
                     fc.private_();
                     fc.final_();
-                    fc.setType(InjectableContext.class);
+                    fc.setType(ArcGenericTypes.INJECTABLE_CONTEXT);
                 });
             } else {
                 contextField = null;
             }
 
             cc.constructor(mc -> {
-                ParamVar id = mc.parameter("id", String.class);
+                ParamVar id = mc.parameter("id", ArcGenericTypes.STRING);
                 mc.body(bc -> {
                     bc.invokeSpecial(ConstructorDesc.of(superClass), cc.this_());
 
@@ -219,7 +215,7 @@ public class ClientProxyGenerator extends AbstractGenerator {
 
             cc.method(GET_CONTEXTUAL_INSTANCE_METHOD_NAME, mc -> {
                 mc.public_();
-                mc.returning(Object.class);
+                mc.returning(ArcGenericTypes.OBJECT);
                 mc.body(bc -> {
                     bc.return_(bc.invokeVirtual(delegateMethod, cc.this_()));
                 });
@@ -227,7 +223,7 @@ public class ClientProxyGenerator extends AbstractGenerator {
 
             cc.method(GET_BEAN, mc -> {
                 mc.public_();
-                mc.returning(InjectableBean.class);
+                mc.returning(ArcGenericTypes.INJECTABLE_BEAN);
                 mc.body(bc -> {
                     bc.return_(cc.this_().field(beanField));
                 });
@@ -242,7 +238,7 @@ public class ClientProxyGenerator extends AbstractGenerator {
                 });
 
                 cc.method(SET_MOCK_METHOD_NAME, mc -> {
-                    ParamVar mock = mc.parameter("mock", Object.class);
+                    ParamVar mock = mc.parameter("mock", ArcGenericTypes.OBJECT);
                     mc.body(bc -> {
                         bc.set(cc.this_().field(mockField), mock);
                         bc.return_();

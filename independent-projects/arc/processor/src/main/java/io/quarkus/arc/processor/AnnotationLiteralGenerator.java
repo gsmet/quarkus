@@ -27,6 +27,7 @@ import io.quarkus.arc.processor.ResourceOutput.Resource;
 import io.quarkus.gizmo2.ClassOutput;
 import io.quarkus.gizmo2.Const;
 import io.quarkus.gizmo2.Expr;
+import io.quarkus.gizmo2.GenericTypes;
 import io.quarkus.gizmo2.Gizmo;
 import io.quarkus.gizmo2.InstanceFieldVar;
 import io.quarkus.gizmo2.LocalVar;
@@ -113,7 +114,7 @@ public class AnnotationLiteralGenerator extends AbstractGenerator {
 
         Gizmo gizmo = Gizmo.create(classOutput);
         gizmo.class_(literal.generatedClassName, cc -> {
-            cc.extends_(AbstractAnnotationLiteral.class);
+            cc.extends_(ArcGenericTypes.ABSTRACT_ANNOTATION_LITERAL);
             cc.implements_(classDescOf(literal.annotationClass));
 
             List<MethodInfo> annotationMembers = literal.annotationMembers();
@@ -149,7 +150,7 @@ public class AnnotationLiteralGenerator extends AbstractGenerator {
 
             cc.method("annotationType", mc -> {
                 mc.public_();
-                mc.returning(Class.class);
+                mc.returning(ArcGenericTypes.CLASS);
                 mc.body(bc -> {
                     bc.return_(Const.of(classDescOf(literal.annotationClass)));
                 });
@@ -254,8 +255,8 @@ public class AnnotationLiteralGenerator extends AbstractGenerator {
     private static void generateEquals(ClassCreator cc, AnnotationLiteralClassInfo literal) {
         cc.method("equals", mc -> {
             mc.public_();
-            mc.returning(boolean.class);
-            ParamVar other = mc.parameter("other", Object.class);
+            mc.returning(GenericTypes.GT_boolean);
+            ParamVar other = mc.parameter("other", ArcGenericTypes.OBJECT);
             mc.body(bc -> {
                 bc.if_(bc.eq(cc.this_(), other), BlockCreator::returnTrue);
 
@@ -316,7 +317,7 @@ public class AnnotationLiteralGenerator extends AbstractGenerator {
     private static void generateHashCode(ClassCreator cc, AnnotationLiteralClassInfo literal) {
         cc.method("hashCode", mc -> {
             mc.public_();
-            mc.returning(int.class);
+            mc.returning(GenericTypes.GT_int);
             mc.body(bc -> {
                 if (literal.annotationMembers().isEmpty()) {
                     bc.return_(0);
@@ -345,7 +346,7 @@ public class AnnotationLiteralGenerator extends AbstractGenerator {
     private static void generateToString(ClassCreator cc, AnnotationLiteralClassInfo literal) {
         cc.method("toString", mc -> {
             mc.public_();
-            mc.returning(String.class);
+            mc.returning(ArcGenericTypes.STRING);
             mc.body(bc -> {
                 if (literal.annotationMembers().isEmpty()) {
                     // short-circuit for memberless annotations

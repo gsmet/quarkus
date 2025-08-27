@@ -16,29 +16,26 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Predicate;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import jakarta.enterprise.context.spi.Contextual;
 import jakarta.enterprise.context.spi.CreationalContext;
 import jakarta.enterprise.event.Reception;
 import jakarta.enterprise.event.TransactionPhase;
-import jakarta.enterprise.inject.spi.EventContext;
 import jakarta.enterprise.inject.spi.ObserverMethod;
 
 import org.jboss.jandex.AnnotationInstance;
 import org.jboss.jandex.ClassInfo;
 import org.jboss.jandex.DotName;
 
-import io.quarkus.arc.InjectableObserverMethod;
 import io.quarkus.arc.impl.CreationalContextImpl;
-import io.quarkus.arc.impl.Mockable;
 import io.quarkus.arc.processor.BeanProcessor.PrivateMembersCollector;
 import io.quarkus.arc.processor.BuiltinBean.GeneratorContext;
 import io.quarkus.arc.processor.ResourceOutput.Resource;
 import io.quarkus.arc.processor.ResourceOutput.Resource.SpecialType;
 import io.quarkus.gizmo2.Const;
 import io.quarkus.gizmo2.Expr;
+import io.quarkus.gizmo2.GenericTypes;
 import io.quarkus.gizmo2.Gizmo;
 import io.quarkus.gizmo2.LocalVar;
 import io.quarkus.gizmo2.ParamVar;
@@ -159,23 +156,23 @@ public class ObserverGenerator extends AbstractGenerator {
     private void createObserver(Gizmo gizmo, ObserverInfo observer, String generatedName, boolean isApplicationClass) {
         // Foo_Observer_fooMethod_hash implements ObserverMethod<T>
         gizmo.class_(generatedName, cc -> {
-            cc.implements_(InjectableObserverMethod.class);
+            cc.implements_(ArcGenericTypes.INJECTABLE_OBSERVER_METHOD);
             if (mockable) {
                 // Observers declared on mocked beans can be disabled during tests
-                cc.implements_(Mockable.class);
+                cc.implements_(ArcGenericTypes.MOCKABLE);
             }
 
             FieldDesc observedType = cc.field(OBSERVED_TYPE, fc -> {
                 fc.private_();
                 fc.final_();
-                fc.setType(Type.class);
+                fc.setType(ArcGenericTypes.REFLECT_TYPE);
             });
             FieldDesc observedQualifiers = null;
             if (!observer.getQualifiers().isEmpty()) {
                 observedQualifiers = cc.field(QUALIFIERS, fc -> {
                     fc.private_();
                     fc.final_();
-                    fc.setType(Set.class);
+                    fc.setType(ArcGenericTypes.SET);
                 });
             }
             FieldDesc mock = null;
@@ -183,14 +180,14 @@ public class ObserverGenerator extends AbstractGenerator {
                 mock = cc.field(MOCK_FIELD, fc -> {
                     fc.private_();
                     fc.volatile_();
-                    fc.setType(boolean.class);
+                    fc.setType(GenericTypes.GT_boolean);
                 });
             }
             // Declaring bean provider
             FieldDesc declaringProvider = cc.field(DECLARING_PROVIDER_SUPPLIER, fc -> {
                 fc.private_();
                 fc.final_();
-                fc.setType(Supplier.class);
+                fc.setType(ArcGenericTypes.SUPPLIER);
             });
             // Injection points
             Map<InjectionPointInfo, FieldDesc> injectionPointToProviderField = new HashMap<>();
@@ -204,7 +201,7 @@ public class ObserverGenerator extends AbstractGenerator {
                     FieldDesc desc = cc.field("observerProviderSupplier" + providerIdx++, fc -> {
                         fc.private_();
                         fc.final_();
-                        fc.setType(Supplier.class);
+                        fc.setType(ArcGenericTypes.SUPPLIER);
                     });
                     injectionPointToProviderField.put(injectionPoint, desc);
                 }
@@ -250,13 +247,13 @@ public class ObserverGenerator extends AbstractGenerator {
             ParamVar declaringProviderSupplier;
             Map<InjectionPointInfo, ParamVar> injectionPointSuppliers = new HashMap<>();
             if (!observer.isSynthetic()) {
-                declaringProviderSupplier = mc.parameter(DECLARING_PROVIDER_SUPPLIER, Supplier.class);
+                declaringProviderSupplier = mc.parameter(DECLARING_PROVIDER_SUPPLIER, ArcGenericTypes.SUPPLIER);
 
                 for (InjectionPointInfo injectionPoint : observer.getInjection().injectionPoints) {
                     if (BuiltinBean.resolve(injectionPoint) == null) {
                         FieldDesc field = injectionPointToProviderField.get(injectionPoint);
                         assert field != null;
-                        injectionPointSuppliers.put(injectionPoint, mc.parameter(field.name(), Supplier.class));
+                        injectionPointSuppliers.put(injectionPoint, mc.parameter(field.name(), ArcGenericTypes.SUPPLIER));
                     }
                 }
             } else {
@@ -415,7 +412,7 @@ public class ObserverGenerator extends AbstractGenerator {
 
         cc.method(ClientProxyGenerator.SET_MOCK_METHOD_NAME, mc -> {
             mc.returning(void.class);
-            ParamVar mock = mc.parameter("ignored", Object.class);
+            ParamVar mock = mc.parameter("ignored", ArcGenericTypes.OBJECT);
             mc.body(bc -> {
                 bc.set(cc.this_().field(mockField), Const.of(true));
                 bc.return_();
@@ -460,7 +457,7 @@ public class ObserverGenerator extends AbstractGenerator {
 
         cc.method("notify", mc -> {
             mc.returning(void.class);
-            ParamVar eventContext = mc.parameter("eventContext", EventContext.class);
+            ParamVar eventContext = mc.parameter("eventContext", ArcGenericTypes.EVENT_CONTEXT);
             mc.body(b0 -> {
                 if (mockField != null) {
                     // if mockable and mocked then just return from the method

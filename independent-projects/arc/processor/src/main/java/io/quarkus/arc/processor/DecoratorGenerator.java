@@ -15,9 +15,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
-import java.util.function.Supplier;
-
-import jakarta.enterprise.context.spi.CreationalContext;
 
 import org.jboss.jandex.AnnotationInstance;
 import org.jboss.jandex.ClassInfo;
@@ -101,8 +98,8 @@ public class DecoratorGenerator extends BeanGenerator {
             String targetPackage, boolean isApplicationClass) {
         ClassInfo decoratorClass = decorator.getTarget().get().asClass();
         gizmo.class_(generatedName, cc -> {
-            cc.implements_(InjectableDecorator.class);
-            cc.implements_(Supplier.class);
+            cc.implements_(ArcGenericTypes.INJECTABLE_DECORATOR);
+            cc.implements_(ArcGenericTypes.SUPPLIER);
 
             Type providerType = decorator.getProviderType();
             if (decorator.isAbstract()) {
@@ -114,24 +111,24 @@ public class DecoratorGenerator extends BeanGenerator {
             FieldDesc beanTypesField = cc.field(FIELD_NAME_BEAN_TYPES, fc -> {
                 fc.private_();
                 fc.final_();
-                fc.setType(Set.class);
+                fc.setType(ArcGenericTypes.SET);
             });
             FieldDesc decoratedTypesField = cc.field(FIELD_NAME_DECORATED_TYPES, fc -> {
                 fc.private_();
                 fc.final_();
-                fc.setType(Set.class);
+                fc.setType(ArcGenericTypes.SET);
             });
             FieldDesc delegateTypeField = cc.field(FIELD_NAME_DELEGATE_TYPE, fc -> {
                 fc.private_();
                 fc.final_();
-                fc.setType(java.lang.reflect.Type.class);
+                fc.setType(ArcGenericTypes.REFLECT_TYPE);
             });
             FieldDesc delegateQualifiersField;
             if (!decorator.getDelegateInjectionPoint().hasDefaultedQualifier()) {
                 delegateQualifiersField = cc.field(FIELD_NAME_QUALIFIERS, fc -> {
                     fc.private_();
                     fc.final_();
-                    fc.setType(Set.class);
+                    fc.setType(ArcGenericTypes.SET);
                 });
             } else {
                 delegateQualifiersField = null;
@@ -234,7 +231,7 @@ public class DecoratorGenerator extends BeanGenerator {
             FieldDesc delegateField = cc.field("impl$delegate", fc -> {
                 fc.private_();
                 fc.final_();
-                fc.setType(Object.class);
+                fc.setType(ArcGenericTypes.OBJECT);
             });
 
             MethodInfo decoratorConstructor = decoratorClass.firstMethod(Methods.INIT);
@@ -247,7 +244,7 @@ public class DecoratorGenerator extends BeanGenerator {
                     superParams.add(mc.parameter(paramName != null ? paramName : "param" + paramIdx, classDescOf(paramType)));
                     paramIdx++;
                 }
-                ParamVar creationalContext = mc.parameter("creationalContext", CreationalContext.class);
+                ParamVar creationalContext = mc.parameter("creationalContext", ArcGenericTypes.CREATIONAL_CONTEXT);
                 mc.body(bc -> {
                     bc.invokeSpecial(constructorDescOf(decoratorConstructor), cc.this_(), superParams);
                     bc.set(cc.this_().field(delegateField),
@@ -360,7 +357,7 @@ public class DecoratorGenerator extends BeanGenerator {
      */
     protected void generateGetDecoratedTypes(io.quarkus.gizmo2.creator.ClassCreator cc, FieldDesc decoratedTypes) {
         cc.method("getDecoratedTypes", mc -> {
-            mc.returning(Set.class);
+            mc.returning(ArcGenericTypes.SET);
             mc.body(bc -> {
                 bc.return_(cc.this_().field(decoratedTypes));
             });
@@ -372,7 +369,7 @@ public class DecoratorGenerator extends BeanGenerator {
      */
     protected void generateGetDelegateType(io.quarkus.gizmo2.creator.ClassCreator cc, FieldDesc delegateType) {
         cc.method("getDelegateType", mc -> {
-            mc.returning(java.lang.reflect.Type.class);
+            mc.returning(ArcGenericTypes.REFLECT_TYPE);
             mc.body(bc -> {
                 bc.return_(cc.this_().field(delegateType));
             });
@@ -385,7 +382,7 @@ public class DecoratorGenerator extends BeanGenerator {
     protected void generateGetDelegateQualifiers(io.quarkus.gizmo2.creator.ClassCreator cc, FieldDesc qualifiersField) {
         if (qualifiersField != null) {
             cc.method("getDelegateQualifiers", mc -> {
-                mc.returning(Set.class);
+                mc.returning(ArcGenericTypes.SET);
                 mc.body(bc -> {
                     bc.return_(cc.this_().field(qualifiersField));
                 });

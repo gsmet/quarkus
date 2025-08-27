@@ -8,6 +8,7 @@ import io.quarkus.arc.InjectableContext;
 import io.quarkus.arc.processor.CustomAlterableContexts.CustomAlterableContextInfo;
 import io.quarkus.arc.processor.ResourceOutput.Resource;
 import io.quarkus.gizmo2.ClassOutput;
+import io.quarkus.gizmo2.GenericTypes;
 import io.quarkus.gizmo2.Gizmo;
 
 /**
@@ -39,14 +40,14 @@ class CustomAlterableContextsGenerator extends AbstractGenerator {
 
         gizmo.class_(info.generatedName, cc -> {
             cc.extends_(info.contextClass);
-            cc.implements_(InjectableContext.class);
+            cc.implements_(ArcGenericTypes.INJECTABLE_CONTEXT);
 
             cc.defaultConstructor();
 
             // implement `isNormal()` if needed
             if (info.isNormal != null) {
                 cc.method("isNormal", mc -> {
-                    mc.returning(boolean.class);
+                    mc.returning(GenericTypes.GT_boolean);
                     mc.body(bc -> {
                         bc.return_(info.isNormal);
                     });
@@ -55,7 +56,7 @@ class CustomAlterableContextsGenerator extends AbstractGenerator {
 
             // implement `destroy()`
             cc.method("destroy", mc -> {
-                mc.returning(void.class);
+                mc.returning(GenericTypes.GT_void);
                 mc.body(bc -> {
                     bc.throw_(UnsupportedOperationException.class, "Custom AlterableContext cannot destroy all instances");
                 });
@@ -72,8 +73,8 @@ class CustomAlterableContextsGenerator extends AbstractGenerator {
 
             // implement `destroy(ContextState)`
             cc.method("destroy", mc -> {
-                mc.returning(void.class);
-                mc.parameter("state", InjectableContext.ContextState.class);
+                mc.returning(GenericTypes.GT_void);
+                mc.parameter("state", ArcGenericTypes.INJECTABLE_CONTEXT_CONTEXT_STATE);
                 mc.body(bc -> {
                     bc.throw_(UnsupportedOperationException.class, "Custom AlterableContext has no state");
                 });

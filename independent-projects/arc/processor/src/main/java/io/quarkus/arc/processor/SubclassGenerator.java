@@ -23,7 +23,6 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
-import jakarta.enterprise.context.spi.CreationalContext;
 import jakarta.enterprise.inject.spi.InterceptionType;
 import jakarta.interceptor.InvocationContext;
 
@@ -39,9 +38,6 @@ import org.jboss.jandex.gizmo2.Jandex2Gizmo;
 
 import io.quarkus.arc.ArcInvocationContext;
 import io.quarkus.arc.ArcUndeclaredThrowableException;
-import io.quarkus.arc.InjectableDecorator;
-import io.quarkus.arc.InjectableInterceptor;
-import io.quarkus.arc.Subclass;
 import io.quarkus.arc.impl.InterceptedMethodMetadata;
 import io.quarkus.arc.processor.BeanInfo.DecorationInfo;
 import io.quarkus.arc.processor.BeanInfo.DecoratorMethod;
@@ -53,6 +49,7 @@ import io.quarkus.arc.processor.ResourceOutput.Resource.SpecialType;
 import io.quarkus.gizmo2.Const;
 import io.quarkus.gizmo2.Expr;
 import io.quarkus.gizmo2.FieldVar;
+import io.quarkus.gizmo2.GenericTypes;
 import io.quarkus.gizmo2.Gizmo;
 import io.quarkus.gizmo2.InstanceFieldVar;
 import io.quarkus.gizmo2.LocalVar;
@@ -129,14 +126,14 @@ public class SubclassGenerator extends AbstractGenerator {
         // Foo_Subclass extends Foo implements Subclass
         gizmo.class_(generatedName, cc -> {
             cc.extends_(classDescOf(providerType));
-            cc.implements_(Subclass.class);
+            cc.implements_(ArcGenericTypes.SUBCLASS);
 
             for (InterceptedDecoratedMethod interceptedDecoratedMethod : codeGenInfo.interceptedDecoratedMethods) {
                 if (interceptedDecoratedMethod.interception() != null) {
                     // Each intercepted method has a corresponding InterceptedMethodMetadata field
                     cc.field("arc$" + interceptedDecoratedMethod.index, fc -> {
                         fc.private_();
-                        fc.setType(InterceptedMethodMetadata.class);
+                        fc.setType(ArcGenericTypes.INTERCEPTED_METHOD_METADATA);
                     });
                 }
             }
@@ -145,7 +142,7 @@ public class SubclassGenerator extends AbstractGenerator {
             if (bean.hasAroundInvokes()) {
                 aroundInvokesField = cc.field("aroundInvokes", fc -> {
                     fc.private_();
-                    fc.setType(List.class);
+                    fc.setType(ArcGenericTypes.LIST);
                 });
             } else {
                 aroundInvokesField = null;
@@ -157,7 +154,7 @@ public class SubclassGenerator extends AbstractGenerator {
                 preDestroys = cc.field(FIELD_NAME_PREDESTROYS, fc -> {
                     fc.private_();
                     fc.final_();
-                    fc.setType(ArrayList.class);
+                    fc.setType(ArcGenericTypes.ARRAY_LIST);
                 });
             } else {
                 preDestroys = null;
@@ -168,7 +165,7 @@ public class SubclassGenerator extends AbstractGenerator {
             FieldDesc constructedField = cc.field(FIELD_NAME_CONSTRUCTED, fc -> {
                 fc.private_();
                 fc.volatile_();
-                fc.setType(boolean.class);
+                fc.setType(GenericTypes.GT_boolean);
             });
 
             // Initialize maps of shared interceptor chains and interceptor bindings
@@ -198,14 +195,14 @@ public class SubclassGenerator extends AbstractGenerator {
                         idx++;
                     }
                 }
-                ParamVar ccParam = mc.parameter("creationalContext", CreationalContext.class);
+                ParamVar ccParam = mc.parameter("creationalContext", ArcGenericTypes.CREATIONAL_CONTEXT);
                 List<ParamVar> interceptorParams = new ArrayList<>();
                 for (int i = 0; i < codeGenInfo.boundInterceptors().size(); i++) {
-                    interceptorParams.add(mc.parameter("interceptor" + i, InjectableInterceptor.class));
+                    interceptorParams.add(mc.parameter("interceptor" + i, ArcGenericTypes.INJECTABLE_INTERCEPTOR));
                 }
                 List<ParamVar> decoratorParams = new ArrayList<>();
                 for (int i = 0; i < codeGenInfo.boundDecorators().size(); i++) {
-                    decoratorParams.add(mc.parameter("decorator" + i, InjectableDecorator.class));
+                    decoratorParams.add(mc.parameter("decorator" + i, ArcGenericTypes.INJECTABLE_DECORATOR));
                 }
 
                 mc.body(bc -> {
@@ -279,9 +276,9 @@ public class SubclassGenerator extends AbstractGenerator {
                             // BiFunction<Object,InvocationContext,Object>
                             Expr lambda = bc.newAnonymousClass(BiFunction.class, acc -> {
                                 acc.method("apply", amc -> {
-                                    ParamVar target = amc.parameter("target", Object.class);
-                                    ParamVar ctx = amc.parameter("ctx", Object.class);
-                                    amc.returning(Object.class);
+                                    ParamVar target = amc.parameter("target", ArcGenericTypes.OBJECT);
+                                    ParamVar ctx = amc.parameter("ctx", ArcGenericTypes.OBJECT);
+                                    amc.returning(ArcGenericTypes.OBJECT);
                                     amc.body(abc -> {
                                         boolean isApplicationClass = applicationClassPredicate.test(bean.getBeanClass());
                                         // Check if interceptor method uses InvocationContext or ArcInvocationContext
@@ -369,7 +366,7 @@ public class SubclassGenerator extends AbstractGenerator {
 
             if (preDestroys != null) {
                 cc.method(DESTROY_METHOD_NAME, mc -> {
-                    ParamVar forward = mc.parameter("forward", Runnable.class);
+                    ParamVar forward = mc.parameter("forward", ArcGenericTypes.RUNNABLE);
                     mc.body(b0 -> {
                         b0.try_(tc -> {
                             tc.body(b1 -> {
@@ -403,9 +400,9 @@ public class SubclassGenerator extends AbstractGenerator {
 
         cc.method("arc$initMetadata" + group.id(), mc -> {
             mc.private_();
-            mc.returning(void.class);
-            ParamVar interceptorChainMapParam = mc.parameter("interceptorChainMap", Map.class);
-            ParamVar bindingsMapParam = mc.parameter("bindingsMap", Map.class);
+            mc.returning(GenericTypes.GT_void);
+            ParamVar interceptorChainMapParam = mc.parameter("interceptorChainMap", ArcGenericTypes.MAP);
+            ParamVar bindingsMapParam = mc.parameter("bindingsMap", ArcGenericTypes.MAP);
             mc.body(bc -> {
                 // to avoid repeatedly looking for the exact same thing in the maps
                 Map<String, LocalVar> chains = new HashMap<>();
@@ -464,9 +461,9 @@ public class SubclassGenerator extends AbstractGenerator {
                         LocalVar forwardFun = bc.localVar("forwardFun", bc.newAnonymousClass(BiFunction.class, acc -> {
                             Var capturedDecorator = decorator != null ? acc.capture(decorator) : null;
                             acc.method("apply", amc -> {
-                                ParamVar target = amc.parameter("target", Object.class);
-                                ParamVar ctx = amc.parameter("ctx", Object.class);
-                                amc.returning(Object.class);
+                                ParamVar target = amc.parameter("target", ArcGenericTypes.OBJECT);
+                                ParamVar ctx = amc.parameter("ctx", ArcGenericTypes.OBJECT);
+                                amc.returning(ArcGenericTypes.OBJECT);
                                 amc.body(abc -> {
                                     MethodDesc desc;
                                     Expr instance;
@@ -565,9 +562,9 @@ public class SubclassGenerator extends AbstractGenerator {
                                 Var capturedAroundInvokes = acc.capture(cc.this_().field(aroundInvokesField));
                                 Var capturedForwardFun = acc.capture(finalForwardFun);
                                 acc.method("apply", amc -> {
-                                    ParamVar target = amc.parameter("target", Object.class); // unused
-                                    ParamVar ctx = amc.parameter("ctx", Object.class);
-                                    amc.returning(Object.class);
+                                    ParamVar target = amc.parameter("target", ArcGenericTypes.OBJECT); // unused
+                                    ParamVar ctx = amc.parameter("ctx", ArcGenericTypes.OBJECT);
+                                    amc.returning(ArcGenericTypes.OBJECT);
                                     amc.body(abc -> {
                                         abc.return_(
                                                 abc.invokeStatic(MethodDescs.INVOCATION_CONTEXTS_PERFORM_TARGET_AROUND_INVOKE,
@@ -596,7 +593,7 @@ public class SubclassGenerator extends AbstractGenerator {
                         FieldDesc metadataField = FieldDesc.of(cc.type(), "arc$" + interceptedDecoratedMethod.index,
                                 InterceptedMethodMetadata.class);
 
-                        bc.set(cc.this_().field(metadataField), methodMetadata);
+                        bc.set(cc.this_().field(metadataField, ArcGenericTypes.INTERCEPTED_METHOD_METADATA), methodMetadata);
 
                         // Needed when running on native image
                         reflectionRegistration.registerMethod(method);
@@ -972,7 +969,7 @@ public class SubclassGenerator extends AbstractGenerator {
         FieldDesc decoratorField = subclass.field(decorator.getIdentifier(), fc -> {
             fc.private_();
             fc.final_();
-            fc.setType(Object.class);
+            fc.setType(ArcGenericTypes.OBJECT);
         });
 
         subclassCtor.set(subclass.this_().field(decoratorField), decoratorInstance);

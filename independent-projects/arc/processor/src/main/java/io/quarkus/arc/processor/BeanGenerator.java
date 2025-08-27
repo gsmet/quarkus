@@ -46,13 +46,11 @@ import org.jboss.jandex.PrimitiveType;
 import org.jboss.jandex.Type;
 import org.jboss.logging.Logger;
 
-import io.quarkus.arc.ActiveResult;
 import io.quarkus.arc.InactiveBeanException;
 import io.quarkus.arc.InjectableBean;
 import io.quarkus.arc.InjectableDecorator;
 import io.quarkus.arc.InjectableInterceptor;
 import io.quarkus.arc.InjectableReferenceProvider;
-import io.quarkus.arc.SyntheticCreationalContext;
 import io.quarkus.arc.impl.CreationalContextImpl;
 import io.quarkus.arc.impl.CurrentInjectionPointProvider;
 import io.quarkus.arc.impl.DecoratorDelegateProvider;
@@ -68,6 +66,7 @@ import io.quarkus.arc.processor.ResourceOutput.Resource.SpecialType;
 import io.quarkus.gizmo2.Const;
 import io.quarkus.gizmo2.Expr;
 import io.quarkus.gizmo2.FieldVar;
+import io.quarkus.gizmo2.GenericTypes;
 import io.quarkus.gizmo2.LocalVar;
 import io.quarkus.gizmo2.ParamVar;
 import io.quarkus.gizmo2.Reflection2Gizmo;
@@ -235,20 +234,20 @@ public class BeanGenerator extends AbstractGenerator {
     private void generateBean(io.quarkus.gizmo2.Gizmo gizmo, BeanInfo bean, String generatedName, String baseName,
             String targetPackage, boolean isApplicationClass, ProviderType providerType) {
         gizmo.class_(generatedName, cc -> {
-            cc.implements_(InjectableBean.class);
-            cc.implements_(Supplier.class);
+            cc.implements_(ArcGenericTypes.INJECTABLE_BEAN);
+            cc.implements_(ArcGenericTypes.SUPPLIER);
 
             FieldDesc beanTypesField = cc.field(FIELD_NAME_BEAN_TYPES, fc -> {
                 fc.private_();
                 fc.final_();
-                fc.setType(Set.class);
+                fc.setType(ArcGenericTypes.SET);
             });
             FieldDesc qualifiersField = null;
             if (!bean.getQualifiers().isEmpty() && !bean.hasDefaultQualifiers()) {
                 qualifiersField = cc.field(FIELD_NAME_QUALIFIERS, fc -> {
                     fc.private_();
                     fc.final_();
-                    fc.setType(Set.class);
+                    fc.setType(ArcGenericTypes.SET);
                 });
             }
             FieldDesc stereotypesField = null;
@@ -256,7 +255,7 @@ public class BeanGenerator extends AbstractGenerator {
                 stereotypesField = cc.field(FIELD_NAME_STEREOTYPES, fc -> {
                     fc.private_();
                     fc.final_();
-                    fc.setType(Set.class);
+                    fc.setType(ArcGenericTypes.SET);
                 });
             }
             FieldDesc declaringProviderSupplierField = null;
@@ -264,7 +263,7 @@ public class BeanGenerator extends AbstractGenerator {
                 declaringProviderSupplierField = cc.field(FIELD_NAME_DECLARING_PROVIDER_SUPPLIER, fc -> {
                     fc.private_();
                     fc.final_();
-                    fc.setType(Supplier.class);
+                    fc.setType(ArcGenericTypes.SUPPLIER);
                 });
             }
             if (bean.getScope().isNormal()) {
@@ -367,7 +366,7 @@ public class BeanGenerator extends AbstractGenerator {
             FieldDesc field = cc.field("injectProviderSupplier" + providerIdx++, fc -> {
                 fc.private_();
                 fc.final_();
-                fc.setType(Supplier.class);
+                fc.setType(ArcGenericTypes.SUPPLIER);
             });
             injectionPointToProvider.put(injectionPoint, field);
         }
@@ -376,7 +375,7 @@ public class BeanGenerator extends AbstractGenerator {
                 FieldDesc field = cc.field("disposerProviderSupplier" + providerIdx++, fc -> {
                     fc.private_();
                     fc.final_();
-                    fc.setType(Supplier.class);
+                    fc.setType(ArcGenericTypes.SUPPLIER);
                 });
                 injectionPointToProvider.put(injectionPoint, field);
             }
@@ -386,7 +385,7 @@ public class BeanGenerator extends AbstractGenerator {
             FieldDesc field = cc.field("interceptorProviderSupplier" + providerIdx++, fc -> {
                 fc.private_();
                 fc.final_();
-                fc.setType(Supplier.class);
+                fc.setType(ArcGenericTypes.SUPPLIER);
             });
             interceptorToProvider.put(interceptor, field);
         }
@@ -395,7 +394,7 @@ public class BeanGenerator extends AbstractGenerator {
             FieldDesc field = cc.field("decoratorProviderSupplier" + providerIdx++, fc -> {
                 fc.private_();
                 fc.final_();
-                fc.setType(Supplier.class);
+                fc.setType(ArcGenericTypes.SUPPLIER);
             });
             decoratorToProvider.put(decorator, field);
         }
@@ -414,27 +413,27 @@ public class BeanGenerator extends AbstractGenerator {
         cc.constructor(mc -> {
             List<ParamVar> params = new ArrayList<>();
             if (bean.isProducer()) {
-                params.add(mc.parameter("declaringBean", Reflection2Gizmo.classDescOf(Supplier.class)));
+                params.add(mc.parameter("declaringBean", ArcGenericTypes.SUPPLIER));
             }
             int ipIdx = 0;
             for (InjectionPointInfo injectionPoint : bean.getAllInjectionPoints()) {
                 if (!injectionPoint.isDelegate() && BuiltinBean.resolve(injectionPoint) == null) {
-                    params.add(mc.parameter("injectionPoint" + (ipIdx++), Reflection2Gizmo.classDescOf(Supplier.class)));
+                    params.add(mc.parameter("injectionPoint" + (ipIdx++), ArcGenericTypes.SUPPLIER));
                 }
             }
             if (bean.getDisposer() != null) {
                 ipIdx = 0;
                 for (InjectionPointInfo injectionPoint : bean.getDisposer().getInjection().injectionPoints) {
                     if (BuiltinBean.resolve(injectionPoint) == null) {
-                        params.add(mc.parameter("disposerInjectionPoint" + (ipIdx++), Supplier.class));
+                        params.add(mc.parameter("disposerInjectionPoint" + (ipIdx++), ArcGenericTypes.SUPPLIER));
                     }
                 }
             }
             for (int i = 0; i < interceptorToProviderField.size(); i++) {
-                params.add(mc.parameter("interceptorProvider" + i, Supplier.class));
+                params.add(mc.parameter("interceptorProvider" + i, ArcGenericTypes.SUPPLIER));
             }
             for (int i = 0; i < decoratorToProviderSupplierField.size(); i++) {
-                params.add(mc.parameter("decoratorProvider" + i, Supplier.class));
+                params.add(mc.parameter("decoratorProvider" + i, ArcGenericTypes.SUPPLIER));
             }
             mc.body(bc -> {
                 // Invoke super()
@@ -538,7 +537,7 @@ public class BeanGenerator extends AbstractGenerator {
 
         MethodDesc createDesc = cc.method("create", mc -> {
             mc.returning(classDescOf(bean.getProviderType()));
-            ParamVar ccParam = mc.parameter("creationalContext", CreationalContext.class);
+            ParamVar ccParam = mc.parameter("creationalContext", ArcGenericTypes.CREATIONAL_CONTEXT);
             mc.body(b0 -> {
                 b0.try_(tc -> {
                     tc.body(b1 -> {
@@ -570,8 +569,8 @@ public class BeanGenerator extends AbstractGenerator {
             // Bridge method needed
             cc.method("create", mc -> {
                 mc.addFlag(ModifierFlag.BRIDGE);
-                mc.returning(Object.class);
-                ParamVar ccParam = mc.parameter("creationalContext", CreationalContext.class);
+                mc.returning(ArcGenericTypes.OBJECT);
+                ParamVar ccParam = mc.parameter("creationalContext", ArcGenericTypes.CREATIONAL_CONTEXT);
                 mc.body(bc -> {
                     bc.return_(bc.invokeVirtual(createDesc, cc.this_(), ccParam));
                 });
@@ -692,8 +691,8 @@ public class BeanGenerator extends AbstractGenerator {
                                 acc.capture(it.provider), acc.capture(it.instance), acc.capture(it.creationalContext)))
                         .toList();
                 acc.method("apply", amc -> {
-                    ParamVar params = amc.parameter("params", Object.class);
-                    amc.returning(Object.class);
+                    ParamVar params = amc.parameter("params", ArcGenericTypes.OBJECT);
+                    amc.returning(ArcGenericTypes.OBJECT);
                     amc.body(abc -> {
                         List<LocalVar> args = new ArrayList<>();
                         if (!injectableCtorParams.isEmpty()) {
@@ -1317,8 +1316,8 @@ public class BeanGenerator extends AbstractGenerator {
 
         MethodDesc createSyntheticDesc = cc.method("createSynthetic", mc -> {
             // TODO returning `Object` because the creation logic would otherwise have to cast explicitly due to Gizmo 2 not casting automatically
-            mc.returning(Object.class);
-            ParamVar synthCC = mc.parameter("synthCC", SyntheticCreationalContext.class);
+            mc.returning(ArcGenericTypes.OBJECT);
+            ParamVar synthCC = mc.parameter("synthCC", ArcGenericTypes.SYNTHETIC_CREATIONAL_CONTEXT);
             mc.body(bc -> {
                 bean.getCreatorConsumer().accept(new BeanConfiguratorBase.CreateGeneration() {
                     @Override
@@ -1342,7 +1341,7 @@ public class BeanGenerator extends AbstractGenerator {
         Consumer<BeanConfiguratorBase.CheckActiveGeneration> checkActiveConsumer = bean.getCheckActiveConsumer();
         if (checkActiveConsumer != null) {
             MethodDesc checkActiveDesc = cc.method("checkActive", mc -> {
-                mc.returning(ActiveResult.class);
+                mc.returning(ArcGenericTypes.ACTIVE_RESULT);
                 mc.body(bc -> {
                     checkActiveConsumer.accept(new BeanConfiguratorBase.CheckActiveGeneration() {
                         @Override
@@ -1518,9 +1517,9 @@ public class BeanGenerator extends AbstractGenerator {
             String targetPackage) {
 
         MethodDesc destroyDesc = cc.method("destroy", mc -> {
-            mc.returning(void.class);
+            mc.returning(GenericTypes.GT_void);
             ParamVar providerParam = mc.parameter("provider", classDescOf(bean.getProviderType()));
-            ParamVar ccParam = mc.parameter("creationalContext", CreationalContext.class);
+            ParamVar ccParam = mc.parameter("creationalContext", ArcGenericTypes.CREATIONAL_CONTEXT);
             mc.body(b0 -> {
                 b0.try_(tc -> {
                     tc.body(b1 -> {
@@ -1740,9 +1739,9 @@ public class BeanGenerator extends AbstractGenerator {
             // Bridge method needed
             cc.method("destroy", mc -> {
                 mc.addFlag(ModifierFlag.BRIDGE);
-                mc.returning(void.class);
-                ParamVar provider = mc.parameter("provider", Object.class);
-                ParamVar creationalContext = mc.parameter("creationalContext", CreationalContext.class);
+                mc.returning(GenericTypes.GT_void);
+                ParamVar provider = mc.parameter("provider", ArcGenericTypes.OBJECT);
+                ParamVar creationalContext = mc.parameter("creationalContext", ArcGenericTypes.CREATIONAL_CONTEXT);
                 mc.body(bc -> {
                     bc.return_(bc.invokeVirtual(destroyDesc, cc.this_(), provider, creationalContext));
                 });
@@ -1752,7 +1751,7 @@ public class BeanGenerator extends AbstractGenerator {
 
     protected void generateSupplierGet(ClassCreator cc) {
         cc.method("get", mc -> {
-            mc.returning(Object.class);
+            mc.returning(ArcGenericTypes.OBJECT);
             mc.body(bc -> {
                 bc.return_(cc.this_());
             });
@@ -1764,7 +1763,7 @@ public class BeanGenerator extends AbstractGenerator {
 
         MethodDesc getDesc = cc.method("get", mc -> {
             mc.returning(providerType);
-            ParamVar creationalContextParam = mc.parameter("creationalContext", CreationalContext.class);
+            ParamVar creationalContextParam = mc.parameter("creationalContext", ArcGenericTypes.CREATIONAL_CONTEXT);
             mc.body(b0 -> {
                 if (bean.getDeployment().hasRuntimeDeferredUnproxyableError(bean)) {
                     b0.throw_(UnproxyableResolutionException.class, "Bean not proxyable: " + bean);
@@ -1814,8 +1813,8 @@ public class BeanGenerator extends AbstractGenerator {
             // Bridge method needed
             cc.method("get", mc -> {
                 mc.addFlag(ModifierFlag.BRIDGE);
-                mc.returning(Object.class);
-                ParamVar creationalContext = mc.parameter("creationalContext", CreationalContext.class);
+                mc.returning(ArcGenericTypes.OBJECT);
+                ParamVar creationalContext = mc.parameter("creationalContext", ArcGenericTypes.CREATIONAL_CONTEXT);
                 mc.body(bc -> {
                     bc.return_(bc.invokeVirtual(getDesc, cc.this_(), creationalContext));
                 });
@@ -1828,7 +1827,7 @@ public class BeanGenerator extends AbstractGenerator {
      */
     protected void generateGetIdentifier(ClassCreator cc, BeanInfo bean) {
         cc.method("getIdentifier", mc -> {
-            mc.returning(String.class);
+            mc.returning(ArcGenericTypes.STRING);
             mc.body(bc -> {
                 bc.return_(Const.of(bean.getIdentifier()));
             });
@@ -1840,7 +1839,7 @@ public class BeanGenerator extends AbstractGenerator {
      */
     protected void generateGetTypes(FieldDesc typesField, ClassCreator cc) {
         cc.method("getTypes", mc -> {
-            mc.returning(Set.class);
+            mc.returning(ArcGenericTypes.SET);
             mc.body(bc -> {
                 bc.return_(cc.this_().field(typesField));
             });
@@ -1852,7 +1851,7 @@ public class BeanGenerator extends AbstractGenerator {
      */
     protected void generateGetScope(ClassCreator cc, BeanInfo bean) {
         cc.method("getScope", mc -> {
-            mc.returning(Class.class);
+            mc.returning(ArcGenericTypes.CLASS);
             mc.body(bc -> {
                 bc.return_(Const.of(classDescOf(bean.getScope().getDotName())));
             });
@@ -1864,7 +1863,7 @@ public class BeanGenerator extends AbstractGenerator {
      */
     protected void generateGetQualifiers(ClassCreator cc, FieldDesc qualifiersField) {
         cc.method("getQualifiers", mc -> {
-            mc.returning(Set.class);
+            mc.returning(ArcGenericTypes.SET);
             mc.body(bc -> {
                 bc.return_(cc.this_().field(qualifiersField));
             });
@@ -1877,7 +1876,7 @@ public class BeanGenerator extends AbstractGenerator {
     protected void generateIsAlternative(ClassCreator cc, BeanInfo bean) {
         if (bean.isAlternative()) {
             cc.method("isAlternative", mc -> {
-                mc.returning(boolean.class);
+                mc.returning(GenericTypes.GT_boolean);
                 mc.body(BlockCreator::returnTrue);
             });
         }
@@ -1889,11 +1888,11 @@ public class BeanGenerator extends AbstractGenerator {
     protected void generateGetPriority(ClassCreator cc, BeanInfo bean) {
         if (bean.getPriority() != null) {
             cc.method("hasPriority", mc -> {
-                mc.returning(boolean.class);
+                mc.returning(GenericTypes.GT_boolean);
                 mc.body(BlockCreator::returnTrue);
             });
             cc.method("getPriority", mc -> {
-                mc.returning(int.class);
+                mc.returning(GenericTypes.GT_int);
                 mc.body(bc -> {
                     bc.return_(bean.getPriority());
                 });
@@ -1907,7 +1906,7 @@ public class BeanGenerator extends AbstractGenerator {
     protected void generateGetDeclaringBean(ClassCreator cc,
             FieldDesc declaringProviderSupplierField) {
         cc.method("getDeclaringBean", mc -> {
-            mc.returning(InjectableBean.class);
+            mc.returning(ArcGenericTypes.INJECTABLE_BEAN);
             mc.body(bc -> {
                 Expr declaringProviderSupplier = cc.this_().field(declaringProviderSupplierField);
                 bc.return_(bc.invokeInterface(MethodDescs.SUPPLIER_GET, declaringProviderSupplier));
@@ -1920,7 +1919,7 @@ public class BeanGenerator extends AbstractGenerator {
      */
     protected void generateGetStereotypes(ClassCreator cc, FieldDesc stereotypesField) {
         cc.method("getStereotypes", mc -> {
-            mc.returning(Set.class);
+            mc.returning(ArcGenericTypes.SET);
             mc.body(bc -> {
                 bc.return_(cc.this_().field(stereotypesField));
             });
@@ -1932,7 +1931,7 @@ public class BeanGenerator extends AbstractGenerator {
      */
     protected void generateGetBeanClass(ClassCreator cc, BeanInfo bean) {
         cc.method("getBeanClass", mc -> {
-            mc.returning(Class.class);
+            mc.returning(ArcGenericTypes.CLASS);
             mc.body(bc -> {
                 bc.return_(Const.of(classDescOf(bean.getBeanClass())));
             });
@@ -1944,7 +1943,7 @@ public class BeanGenerator extends AbstractGenerator {
      */
     protected void generateGetImplementationClass(ClassCreator cc, BeanInfo bean) {
         cc.method("getImplementationClass", mc -> {
-            mc.returning(Class.class);
+            mc.returning(ArcGenericTypes.CLASS);
             mc.body(bc -> {
                 bc.return_(bean.getImplClazz() != null
                         ? Const.of(classDescOf(bean.getImplClazz()))
@@ -1959,7 +1958,7 @@ public class BeanGenerator extends AbstractGenerator {
     protected void generateGetName(ClassCreator cc, BeanInfo bean) {
         if (bean.getName() != null) {
             cc.method("getName", mc -> {
-                mc.returning(String.class);
+                mc.returning(ArcGenericTypes.STRING);
                 mc.body(bc -> {
                     bc.return_(Const.of(bean.getName()));
                 });
@@ -1972,7 +1971,7 @@ public class BeanGenerator extends AbstractGenerator {
      */
     protected void generateIsDefaultBean(ClassCreator cc, BeanInfo bean) {
         cc.method("isDefaultBean", mc -> {
-            mc.returning(boolean.class);
+            mc.returning(GenericTypes.GT_boolean);
             mc.body(bc -> {
                 bc.return_(bean.isDefaultBean());
             });
@@ -2002,7 +2001,7 @@ public class BeanGenerator extends AbstractGenerator {
             throw new IllegalArgumentException("Unknown bean kind: " + bean);
         }
         cc.method("getKind", mc -> {
-            mc.returning(InjectableBean.Kind.class);
+            mc.returning(ArcGenericTypes.INJECTABLE_BEAN_KIND);
             mc.body(bc -> {
                 bc.return_(Expr.staticField(FieldDesc.of(InjectableBean.Kind.class, kind.name())));
             });
@@ -2014,7 +2013,7 @@ public class BeanGenerator extends AbstractGenerator {
      */
     protected void generateIsSuppressed(ClassCreator cc, BeanInfo bean) {
         cc.method("isSuppressed", mc -> {
-            mc.returning(boolean.class);
+            mc.returning(GenericTypes.GT_boolean);
             mc.body(bc -> {
                 for (Function<BeanInfo, Consumer<BlockCreator>> generator : suppressConditionGenerators) {
                     Consumer<BlockCreator> condition = generator.apply(bean);
@@ -2044,7 +2043,7 @@ public class BeanGenerator extends AbstractGenerator {
         }
 
         cc.method("getInjectionPoints", mc -> {
-            mc.returning(Set.class);
+            mc.returning(ArcGenericTypes.SET);
             mc.body(bc -> {
                 LocalVar tccl = bc.localVar("tccl", bc.invokeVirtual(MethodDescs.THREAD_GET_TCCL, bc.currentThread()));
                 LocalVar result = bc.localVar("result", bc.new_(HashSet.class));
@@ -2068,8 +2067,8 @@ public class BeanGenerator extends AbstractGenerator {
 
     protected void generateEquals(ClassCreator cc, BeanInfo bean) {
         cc.method("equals", mc -> {
-            mc.returning(boolean.class);
-            ParamVar other = mc.parameter("other", Object.class);
+            mc.returning(GenericTypes.GT_boolean);
+            ParamVar other = mc.parameter("other", ArcGenericTypes.OBJECT);
             mc.body(bc -> {
                 // if (this == other) {
                 //    return true;
@@ -2093,7 +2092,7 @@ public class BeanGenerator extends AbstractGenerator {
 
     protected void generateHashCode(ClassCreator cc, BeanInfo bean) {
         cc.method("hashCode", mc -> {
-            mc.returning(int.class);
+            mc.returning(GenericTypes.GT_int);
             mc.body(bc -> {
                 bc.return_(Const.of(bean.getIdentifier().hashCode()));
             });
@@ -2102,7 +2101,7 @@ public class BeanGenerator extends AbstractGenerator {
 
     protected void generateToString(ClassCreator cc) {
         cc.method("toString", mc -> {
-            mc.returning(String.class);
+            mc.returning(ArcGenericTypes.STRING);
             mc.body(bc -> {
                 bc.return_(bc.invokeStatic(MethodDescs.BEANS_TO_STRING, cc.this_()));
             });

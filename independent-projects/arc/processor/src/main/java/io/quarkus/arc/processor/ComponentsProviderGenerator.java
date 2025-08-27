@@ -32,11 +32,11 @@ import org.jboss.jandex.Type;
 import io.quarkus.arc.Arc;
 import io.quarkus.arc.Components;
 import io.quarkus.arc.ComponentsProvider;
-import io.quarkus.arc.CurrentContextFactory;
 import io.quarkus.arc.InjectableBean;
 import io.quarkus.arc.processor.ResourceOutput.Resource;
 import io.quarkus.gizmo2.Const;
 import io.quarkus.gizmo2.Expr;
+import io.quarkus.gizmo2.GenericTypes;
 import io.quarkus.gizmo2.Gizmo;
 import io.quarkus.gizmo2.LocalVar;
 import io.quarkus.gizmo2.ParamVar;
@@ -115,13 +115,13 @@ public class ComponentsProviderGenerator extends AbstractGenerator {
         String generatedName = SETUP_PACKAGE + "." + name + COMPONENTS_PROVIDER_SUFFIX;
 
         gizmo.class_(generatedName, cc -> {
-            cc.implements_(ComponentsProvider.class);
+            cc.implements_(ArcGenericTypes.COMPONENTS_PROVIDER);
 
             cc.defaultConstructor();
 
             cc.method("getComponents", mc -> {
-                mc.returning(Components.class);
-                ParamVar currentContextFactory = mc.parameter("currentContextFactory", CurrentContextFactory.class);
+                mc.returning(ArcGenericTypes.COMPONENTS);
+                ParamVar currentContextFactory = mc.parameter("currentContextFactory", ArcGenericTypes.CURRENT_CONTEXT_FACTORY);
                 mc.body(bc -> {
                     // Break bean processing into multiple addBeans() methods
                     // Map<String, InjectableBean<?>>
@@ -189,7 +189,7 @@ public class ComponentsProviderGenerator extends AbstractGenerator {
                     if (detectUnusedFalsePositives) {
                         removedBeansSupplier = bc.localVar("removedBeansSupplier", bc.newAnonymousClass(Supplier.class, acc -> {
                             acc.method("get", amc -> {
-                                amc.returning(Object.class);
+                                amc.returning(ArcGenericTypes.OBJECT);
                                 amc.body(abc -> {
                                     LocalVar removedBeans = abc.localVar("removedBeans", abc.new_(ArrayList.class));
                                     LocalVar typeCache = abc.localVar("typeCache", abc.new_(HashMap.class));
@@ -250,7 +250,7 @@ public class ComponentsProviderGenerator extends AbstractGenerator {
                         scopeToContextInstances.forEach((scopeClass, contextClass) -> {
                             Expr contextSupplier = bc.newAnonymousClass(Supplier.class, acc -> {
                                 acc.method("get", amc -> {
-                                    amc.returning(Object.class);
+                                    amc.returning(ArcGenericTypes.OBJECT);
                                     amc.body(abc -> {
                                         abc.return_(abc.new_(ConstructorDesc.of(ClassDesc.of(contextClass))));
                                     });
@@ -283,8 +283,8 @@ public class ComponentsProviderGenerator extends AbstractGenerator {
         for (BeanGroup group : info.beanGroups()) {
             cc.method(ADD_BEANS + group.id(), mc -> {
                 mc.private_();
-                mc.returning(void.class);
-                ParamVar beanIdToBean = mc.parameter("beanIdToBean", Map.class);
+                mc.returning(GenericTypes.GT_void);
+                ParamVar beanIdToBean = mc.parameter("beanIdToBean", ArcGenericTypes.MAP);
                 mc.body(bc -> {
                     for (BeanInfo bean : group.beans()) {
                         ClassDesc beanType = beanToGeneratedName.containsKey(bean)
@@ -372,9 +372,9 @@ public class ComponentsProviderGenerator extends AbstractGenerator {
         for (ObserverGroup group : info.observerGroups()) {
             cc.method(ADD_OBSERVERS + group.id(), mc -> {
                 mc.private_();
-                mc.returning(void.class);
-                ParamVar beanIdToBean = mc.parameter("beanIdToBean", Map.class);
-                ParamVar observers = mc.parameter("observers", List.class);
+                mc.returning(GenericTypes.GT_void);
+                ParamVar beanIdToBean = mc.parameter("beanIdToBean", ArcGenericTypes.MAP);
+                ParamVar observers = mc.parameter("observers", ArcGenericTypes.LIST);
                 mc.body(bc -> {
                     for (ObserverInfo observer : group.observers()) {
                         ClassDesc observerType = observerToGeneratedName.containsKey(observer)
@@ -413,9 +413,9 @@ public class ComponentsProviderGenerator extends AbstractGenerator {
         for (RemovedBeanGroup group : info.removedBeans()) {
             cc.staticMethod(ADD_REMOVED_BEANS + group.id(), mc -> {
                 mc.public_(); // to allow access from an anonymous class
-                mc.returning(void.class);
-                ParamVar rtRemovedBeans = mc.parameter("removedBeans", List.class);
-                ParamVar typeCacheMap = mc.parameter("typeCache", Map.class);
+                mc.returning(GenericTypes.GT_void);
+                ParamVar rtRemovedBeans = mc.parameter("removedBeans", ArcGenericTypes.LIST);
+                ParamVar typeCacheMap = mc.parameter("typeCache", ArcGenericTypes.MAP);
                 mc.body(b0 -> {
                     LocalVar tccl = b0.localVar("tccl",
                             b0.invokeVirtual(MethodDescs.THREAD_GET_TCCL, b0.currentThread()));

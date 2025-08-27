@@ -9,22 +9,19 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.Consumer;
-import java.util.function.Supplier;
 
 import org.jboss.jandex.DotName;
 
 import io.quarkus.arc.ContextInstanceHandle;
-import io.quarkus.arc.impl.ContextInstances;
 import io.quarkus.arc.processor.ResourceOutput.Resource;
 import io.quarkus.gizmo2.Const;
 import io.quarkus.gizmo2.Expr;
 import io.quarkus.gizmo2.FieldVar;
+import io.quarkus.gizmo2.GenericTypes;
 import io.quarkus.gizmo2.Gizmo;
 import io.quarkus.gizmo2.LocalVar;
 import io.quarkus.gizmo2.ParamVar;
@@ -70,11 +67,8 @@ public class ContextInstancesGenerator extends AbstractGenerator {
 
         List<BeanInfo> beans = new BeanStream(beanDeployment.getBeans()).withScope(scope).collect();
 
-        MethodDesc newUpdater = MethodDesc.of(AtomicReferenceFieldUpdater.class, "newUpdater",
-                AtomicReferenceFieldUpdater.class, Class.class, Class.class, String.class);
-
         gizmo.class_(generatedName, cc -> {
-            cc.implements_(ContextInstances.class);
+            cc.implements_(ArcGenericTypes.CONTEXT_INSTANCES);
 
             Map<String, BeanFields> beanFields = new TreeMap<>();
             int fieldIndex = 0;
@@ -89,20 +83,20 @@ public class ContextInstancesGenerator extends AbstractGenerator {
                 FieldDesc handleField = cc.field("h" + beanIdx, fc -> {
                     fc.private_();
                     fc.volatile_();
-                    fc.setType(ContextInstanceHandle.class);
+                    fc.setType(ArcGenericTypes.CONTEXT_INSTANCE_HANDLE);
                 });
                 FieldDesc lockField = cc.field("l" + beanIdx, fc -> {
                     fc.private_();
                     fc.volatile_();
-                    fc.setType(Lock.class);
+                    fc.setType(ArcGenericTypes.LOCK);
                 });
                 StaticFieldVar lockUpdaterField = cc.staticField("L" + beanIdx + "_UPDATER", fc -> {
                     fc.private_();
                     fc.final_();
-                    fc.setType(AtomicReferenceFieldUpdater.class);
+                    fc.setType(ArcGenericTypes.ATOMIC_REFERENCE_FIELD_UPDATER);
                     fc.setInitializer(bc -> {
-                        bc.yield(bc.invokeStatic(newUpdater, Const.of(cc.type()), Const.of(Lock.class),
-                                Const.of("l" + beanIdx)));
+                        bc.yield(bc.invokeStatic(MethodDescs.ATOMIC_REFERENCE_FIELD_UPDATER_NEW_UPDATER, Const.of(cc.type()),
+                                Const.of(Lock.class), Const.of("l" + beanIdx)));
                     });
                 });
 
@@ -140,7 +134,7 @@ public class ContextInstancesGenerator extends AbstractGenerator {
             // }
             MethodDesc desc = cc.method("lazy" + fields.lock().name(), mc -> {
                 mc.private_();
-                mc.returning(Lock.class);
+                mc.returning(ArcGenericTypes.LOCK);
                 mc.body(b0 -> {
                     FieldVar lock = cc.this_().field(fields.lock());
                     b0.ifNotNull(lock, b1 -> {
@@ -168,8 +162,8 @@ public class ContextInstancesGenerator extends AbstractGenerator {
             BeanFields fields = idToFields.getValue();
             // There is a separate compute method for every bean instance field
             MethodDesc desc = cc.method("c" + fields.instance().name(), mc -> {
-                mc.returning(ContextInstanceHandle.class);
-                ParamVar supplier = mc.parameter("supplier", Supplier.class);
+                mc.returning(ArcGenericTypes.CONTEXT_INSTANCE_HANDLE);
+                ParamVar supplier = mc.parameter("supplier", ArcGenericTypes.SUPPLIER);
                 mc.body(b0 -> {
                     // ContextInstanceHandle<?> copy = this.h<idx>;
                     // if (copy != null) {
@@ -208,9 +202,9 @@ public class ContextInstancesGenerator extends AbstractGenerator {
         }
 
         cc.method("computeIfAbsent", mc -> {
-            mc.returning(ContextInstanceHandle.class);
-            ParamVar rtBeanId = mc.parameter("beanId", String.class);
-            ParamVar supplier = mc.parameter("supplier", Supplier.class);
+            mc.returning(ArcGenericTypes.CONTEXT_INSTANCE_HANDLE);
+            ParamVar rtBeanId = mc.parameter("beanId", ArcGenericTypes.STRING);
+            ParamVar supplier = mc.parameter("supplier", ArcGenericTypes.SUPPLIER);
             mc.body(b0 -> {
                 b0.return_(b0.switch_(ContextInstanceHandle.class, rtBeanId, sc -> {
                     for (String btBeanId : beanFields.keySet()) {
@@ -228,8 +222,8 @@ public class ContextInstancesGenerator extends AbstractGenerator {
 
     private void generateGetIfPresent(ClassCreator cc, Map<String, BeanFields> beanFields) {
         cc.method("getIfPresent", mc -> {
-            mc.returning(ContextInstanceHandle.class);
-            ParamVar rtBeanId = mc.parameter("beanId", String.class);
+            mc.returning(ArcGenericTypes.CONTEXT_INSTANCE_HANDLE);
+            ParamVar rtBeanId = mc.parameter("beanId", ArcGenericTypes.STRING);
             mc.body(b0 -> {
                 b0.return_(b0.switch_(ContextInstanceHandle.class, rtBeanId, sc -> {
                     for (Map.Entry<String, BeanFields> idToFields : beanFields.entrySet()) {
@@ -249,7 +243,7 @@ public class ContextInstancesGenerator extends AbstractGenerator {
 
     private void generateGetAllPresent(ClassCreator cc, Map<String, BeanFields> beanFields) {
         cc.method("getAllPresent", mc -> {
-            mc.returning(Set.class);
+            mc.returning(ArcGenericTypes.SET);
             mc.body(b0 -> {
                 // ContextInstanceHandle<?> h<idx> = this.h<idx>;
                 // Set<ContextInstanceHandle<?>> result = new HashSet<>();
@@ -284,7 +278,7 @@ public class ContextInstancesGenerator extends AbstractGenerator {
             BeanFields fields = idToFields.getValue();
             FieldDesc instanceField = fields.instance;
             MethodDesc desc = cc.method("r" + instanceField.name(), mc -> {
-                mc.returning(ContextInstanceHandle.class);
+                mc.returning(ArcGenericTypes.CONTEXT_INSTANCE_HANDLE);
                 mc.body(b0 -> {
                     // ContextInstanceHandle<?> copy = this.h<idx>;
                     // if (copy == null) {
@@ -317,7 +311,7 @@ public class ContextInstancesGenerator extends AbstractGenerator {
 
         cc.method("remove", mc -> {
             mc.returning(ContextInstanceHandle.class);
-            ParamVar rtBeanId = mc.parameter("beanId", String.class);
+            ParamVar rtBeanId = mc.parameter("beanId", ArcGenericTypes.STRING);
             mc.body(b0 -> {
                 b0.return_(b0.switch_(ContextInstanceHandle.class, rtBeanId, sc -> {
                     for (String btBeanId : beanFields.keySet()) {
@@ -337,8 +331,8 @@ public class ContextInstancesGenerator extends AbstractGenerator {
 
     private void generateRemoveEach(ClassCreator cc, List<MethodDesc> removeInstances) {
         cc.method("removeEach", mc -> {
-            mc.returning(void.class);
-            ParamVar action = mc.parameter("action", Consumer.class);
+            mc.returning(GenericTypes.GT_void);
+            ParamVar action = mc.parameter("action", ArcGenericTypes.CONSUMER);
             mc.body(b0 -> {
                 // ContextInstanceHandle<?> copy<idx> = rh<idx>();
                 // if (action != null)
