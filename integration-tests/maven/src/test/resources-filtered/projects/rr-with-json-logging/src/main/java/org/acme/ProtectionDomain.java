@@ -64,7 +64,7 @@ public class ProtectionDomain {
                     }
                 }
             }
-            return SUCCESS;
+            return SUCCESS + " " + location;
         } catch (Exception e) {
             e.printStackTrace();
             return errorResult(testType, "exception during resolution of resource");
