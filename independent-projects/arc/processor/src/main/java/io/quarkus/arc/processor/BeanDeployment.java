@@ -1317,6 +1317,7 @@ public class BeanDeployment {
                 beans.add(classBean);
                 beanClassToBean.put(beanClass, classBean);
                 injectionPoints.addAll(classBean.getAllInjectionPoints());
+                detectNullInjectionPoint(classBean.getAllInjectionPoints(), classBean.getBeanClass().toString());
 
                 // specification requires to disallow non-static public fields on non-`@Dependent` beans,
                 // but we do what Weld does: only disallow them on normal scoped beans (disallowing them
@@ -1352,6 +1353,7 @@ public class BeanDeployment {
                 injection.init(declaringBean);
                 disposers.add(new DisposerInfo(declaringBean, disposerMethod, injection));
                 injectionPoints.addAll(injection.injectionPoints);
+                detectNullInjectionPoint(injection.injectionPoints, declaringBean.getBeanClass().toString());
             }
         }
         Set<DisposerInfo> unusedDisposers = new HashSet<>(disposers);
@@ -1367,6 +1369,8 @@ public class BeanDeployment {
                 if (producerMethodBean != null) {
                     beans.add(producerMethodBean);
                     injectionPoints.addAll(producerMethodBean.getAllInjectionPoints());
+                    detectNullInjectionPoint(producerMethodBean.getAllInjectionPoints(),
+                            producerMethodBean.getBeanClass().toString());
                 }
             }
         }
@@ -1482,6 +1486,8 @@ public class BeanDeployment {
                 if (observer != null) {
                     observers.add(observer);
                     injectionPoints.addAll(injection.injectionPoints);
+                    detectNullInjectionPoint(injection.injectionPoints, declaringBean.getBeanClass().toString()
+                            + ", observer method: " + observerMethod);
                 }
             }
         }
@@ -2000,6 +2006,12 @@ public class BeanDeployment {
             return new BeanStream(get(Key.BEANS));
         }
 
+    }
+
+    private static void detectNullInjectionPoint(List<InjectionPointInfo> injectionPoints, String context) {
+        if (injectionPoints.stream().anyMatch(Objects::isNull)) {
+            LOGGER.error("null InjectionPointInfo in the context of: " + context);
+        }
     }
 
 }
