@@ -37,6 +37,7 @@ import io.quarkus.builder.BuildChainBuilder;
 import io.quarkus.builder.BuildContext;
 import io.quarkus.builder.BuildStep;
 import io.quarkus.deployment.builditem.ApplicationClassPredicateBuildItem;
+import io.quarkus.deployment.console.ConsoleCliManager;
 import io.quarkus.deployment.console.ConsoleCommand;
 import io.quarkus.deployment.console.ConsoleStateManager;
 import io.quarkus.deployment.dev.testing.TestSupport;
@@ -82,9 +83,7 @@ public class IsolatedDevModeMain implements BiConsumer<CuratedApplication, Map<S
                 //this is a bit yuck, but we need replace the default
                 //exit handler in the runtime class loader
                 //TODO: look at implementing a common core classloader, that removes the need for this sort of crappy hack
-                curatedApplication.getOrCreateBaseRuntimeClassLoader().loadClass(ApplicationLifecycleManager.class.getName())
-                        .getMethod("setDefaultExitCodeHandler", Consumer.class)
-                        .invoke(null, getExitCodeHandler());
+                setDefaultExitCodeHandler();
 
                 StartupAction start = augmentAction.createInitialRuntimeApplication();
                 try {
@@ -158,6 +157,26 @@ public class IsolatedDevModeMain implements BiConsumer<CuratedApplication, Map<S
         }
     }
 
+    private void setDefaultExitCodeHandler() {
+        try {
+            curatedApplication.getOrCreateBaseRuntimeClassLoader().loadClass(ApplicationLifecycleManager.class.getName())
+                    .getMethod("setDefaultExitCodeHandler", Consumer.class)
+                    .invoke(null, getExitCodeHandler());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void resetDefaultExitCodeHandler() {
+        try {
+            curatedApplication.getOrCreateBaseRuntimeClassLoader().loadClass(ApplicationLifecycleManager.class.getName())
+                    .getMethod("setDefaultExitCodeHandler", Consumer.class)
+                    .invoke(null, (Consumer<Integer>) null);
+        } catch (Exception e) {
+            log.debug("Failed to reset default exit code handler", e);
+        }
+    }
+
     private Consumer<Integer> getExitCodeHandler() {
         if (context.isTest() || context.isAbortOnFailedStart()) {
             return TestExitCodeHandler.INSTANCE;
@@ -205,6 +224,7 @@ public class IsolatedDevModeMain implements BiConsumer<CuratedApplication, Map<S
 
             //ok, we have resolved all the deps
             try {
+                setDefaultExitCodeHandler();
                 StartupAction start = augmentAction.reloadExistingApplication(firstStartCompleted, changedResources,
                         classChangeInformation);
                 try {
@@ -318,10 +338,16 @@ public class IsolatedDevModeMain implements BiConsumer<CuratedApplication, Map<S
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
+                try {
+                    resetDefaultExitCodeHandler();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             } finally {
                 Thread.currentThread().setContextClassLoader(old);
             }
         }
+        ConsoleCliManager.setCommands(List.of());
     }
 
     public void close() {
