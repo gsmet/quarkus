@@ -28,13 +28,6 @@ public class MutinyInfrastructure {
         // Mutiny leaks a ScheduledExecutorService if we don't do this
         Infrastructure.getDefaultWorkerPool().shutdown();
         Infrastructure.setDefaultExecutor(executor);
-        shutdownContext.addLastShutdownTask(new Runnable() {
-            @Override
-            public void run() {
-                Infrastructure.getDefaultWorkerPool().shutdown();
-                Infrastructure.setDefaultExecutor(Runnable::run, false);
-            }
-        });
     }
 
     /**
