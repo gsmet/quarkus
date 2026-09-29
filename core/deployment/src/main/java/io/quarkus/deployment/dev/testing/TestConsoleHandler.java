@@ -35,7 +35,7 @@ public class TestConsoleHandler implements TestListener {
 
     public static final ConsoleCommand TOGGLE_TEST_OUTPUT = new ConsoleCommand('o', "Toggle test output", "Toggle test output",
             1000,
-            new ConsoleCommand.HelpState(TestSupport.instance().get()::isDisplayTestOutput),
+            new ConsoleCommand.HelpState(() -> TestSupport.instance().get().isDisplayTestOutput()),
             () -> TestSupport.instance().get().toggleTestOutput());
 
     final DevModeType devModeType;
