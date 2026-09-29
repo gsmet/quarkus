@@ -22,6 +22,10 @@ public class DevServicesCommand implements GroupCommand {
         DevServicesCommand.serviceDescriptions = serviceDescriptions;
     }
 
+    public static void reset() {
+        serviceDescriptions = null;
+    }
+
     @Override
     public List<Command> getCommands() {
         return List.of(new DevServicesListCommand(), new DevServicesLogsCommand());
