@@ -225,6 +225,12 @@
                         <parentFirstArtifact>org.apache.groovy:groovy</parentFirstArtifact>
                         <parentFirstArtifact>org.apache.groovy:groovy-json</parentFirstArtifact>
                         <parentFirstArtifact>org.apache.groovy:groovy-xml</parentFirstArtifact>
+
+                        <!-- Load Netty buffer/common parent first so all classloaders share
+                             one copy. PoolArena has finalize() methods that create Finalizer
+                             entries preventing per-test classloaders from being collected. -->
+                        <parentFirstArtifact>io.netty:netty-common</parentFirstArtifact>
+                        <parentFirstArtifact>io.netty:netty-buffer</parentFirstArtifact>
                     </parentFirstArtifacts>
                     <runnerParentFirstArtifacts>
                         <runnerParentFirstArtifact>org.graalvm.sdk:nativeimage</runnerParentFirstArtifact>
