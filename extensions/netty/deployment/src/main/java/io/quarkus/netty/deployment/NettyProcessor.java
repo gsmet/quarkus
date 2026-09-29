@@ -35,7 +35,6 @@ import io.netty.channel.DefaultChannelId;
 import io.netty.channel.EventLoopGroup;
 import io.netty.resolver.dns.DnsServerAddressStreamProviders;
 import io.netty.util.internal.PlatformDependent;
-import io.netty.util.internal.logging.InternalLoggerFactory;
 import io.quarkus.arc.deployment.AdditionalBeanBuildItem;
 import io.quarkus.arc.deployment.SyntheticBeanBuildItem;
 import io.quarkus.bootstrap.classloading.QuarkusClassLoader;
@@ -90,21 +89,12 @@ class NettyProcessor {
 
     private static final int DEFAULT_NETTY_ALLOCATOR_MAX_ORDER = 3;
 
-    static {
-        InternalLoggerFactory.setDefaultFactory(new JBossNettyLoggerFactory());
-        ClassLoader cl = NettyProcessor.class.getClassLoader();
-        if (cl instanceof QuarkusClassLoader) {
-            ((QuarkusClassLoader) cl).addCloseTask(() -> {
-                try {
-                    java.lang.reflect.Field f = InternalLoggerFactory.class.getDeclaredField("defaultFactory");
-                    f.setAccessible(true);
-                    if (f.get(null) instanceof JBossNettyLoggerFactory) {
-                        f.set(null, null);
-                    }
-                } catch (Exception ignored) {
-                }
-            });
-        }
+    @BuildStep
+    void setNettyLoggerFactory(ServiceRegistrar serviceRegistrar) {
+        serviceRegistrar
+                .forService("io.quarkus.netty.logger-factory")
+                .atPhase(Phase.STATIC_INIT)
+                .onStart(ctx -> NettyRecorder.setNettyLoggerFactory());
     }
 
     @BuildStep
