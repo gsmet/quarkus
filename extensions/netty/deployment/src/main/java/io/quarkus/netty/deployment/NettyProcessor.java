@@ -92,6 +92,19 @@ class NettyProcessor {
 
     static {
         InternalLoggerFactory.setDefaultFactory(new JBossNettyLoggerFactory());
+        ClassLoader cl = NettyProcessor.class.getClassLoader();
+        if (cl instanceof QuarkusClassLoader) {
+            ((QuarkusClassLoader) cl).addCloseTask(() -> {
+                try {
+                    java.lang.reflect.Field f = InternalLoggerFactory.class.getDeclaredField("defaultFactory");
+                    f.setAccessible(true);
+                    if (f.get(null) instanceof JBossNettyLoggerFactory) {
+                        f.set(null, null);
+                    }
+                } catch (Exception ignored) {
+                }
+            });
+        }
     }
 
     @BuildStep
