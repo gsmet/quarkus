@@ -231,6 +231,10 @@
                              entries preventing per-test classloaders from being collected. -->
                         <parentFirstArtifact>io.netty:netty-common</parentFirstArtifact>
                         <parentFirstArtifact>io.netty:netty-buffer</parentFirstArtifact>
+                        <!-- Netty util must be parent first so logger instances and
+                             exception classes stored in static fields of AppCL Netty
+                             classes don't pin per-test classloaders. -->
+                        <parentFirstArtifact>io.quarkus.netty:quarkus-netty-util</parentFirstArtifact>
                     </parentFirstArtifacts>
                     <runnerParentFirstArtifacts>
                         <runnerParentFirstArtifact>org.graalvm.sdk:nativeimage</runnerParentFirstArtifact>

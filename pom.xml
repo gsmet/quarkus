@@ -115,6 +115,7 @@
         <module>independent-projects/tools</module>
         <module>independent-projects/enforcer-rules</module>
         <module>independent-projects/vertx-utils</module>
+        <module>independent-projects/netty-util</module>
         <module>independent-projects/resteasy-reactive</module>
         <module>independent-projects/extension-maven-plugin</module>
         <module>independent-projects/junit-virtual-threads</module>
