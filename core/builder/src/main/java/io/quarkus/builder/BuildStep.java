@@ -21,7 +21,7 @@ public interface BuildStep {
      * @return the identifier
      */
     default String getId() {
-        return toString();
+        return getClass().getName();
     }
 
     /**
