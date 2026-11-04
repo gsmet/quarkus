@@ -40,7 +40,6 @@ import io.quarkus.arc.deployment.SyntheticBeanBuildItem;
 import io.quarkus.bootstrap.classloading.QuarkusClassLoader;
 import io.quarkus.core.Phase;
 import io.quarkus.core.deployment.service.ServiceRegistrar;
-import io.quarkus.deployment.IsNormal;
 import io.quarkus.deployment.annotations.BuildProducer;
 import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.builditem.BytecodeTransformerBuildItem;
@@ -96,30 +95,6 @@ class NettyProcessor {
                 .forService("io.quarkus.netty.logger-factory")
                 .atPhase(Phase.STATIC_INIT)
                 .onStart(ctx -> NettyRecorder.setNettyLoggerFactory());
-    }
-
-    /**
-     * In dev/test mode, clear the JVM-internal backtrace from exceptions stored in
-     * static fields of parent-first classes (Netty's {@code PlatformDependent0} and
-     * H2's {@code DbException}).
-     * <p>
-     * When Unsafe is unavailable (e.g. JDK 25+), Netty stores
-     * {@code UnsupportedOperationException} instances whose backtrace captures class
-     * references from per-test classloaders. Similarly, H2's {@code DbException.OOME}
-     * holds a pre-allocated exception with backtrace references. Since these live in
-     * static fields on AppCL classes, the backtraces permanently prevent per-test
-     * classloaders from being garbage collected.
-     * <p>
-     * Bytecode transforms cannot apply to parent-first classes (loaded by the AppCL
-     * before transforms run), so we clear the backtraces via reflection after
-     * initialization.
-     */
-    @BuildStep(onlyIfNot = IsNormal.class)
-    void clearParentFirstExceptionBacktraces(ServiceRegistrar serviceRegistrar) {
-        serviceRegistrar
-                .forService("io.quarkus.netty.clear-parent-first-exception-backtraces")
-                .atPhase(Phase.STATIC_INIT)
-                .onStart(ctx -> NettyRecorder.clearUnsafeUnavailabilityCauseBacktrace());
     }
 
     @BuildStep
