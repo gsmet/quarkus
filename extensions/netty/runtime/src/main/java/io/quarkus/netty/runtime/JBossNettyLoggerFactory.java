@@ -1,4 +1,4 @@
-package io.quarkus.netty.util;
+package io.quarkus.netty.runtime;
 
 import org.jboss.logging.Logger;
 

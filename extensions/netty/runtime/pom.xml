@@ -19,10 +19,6 @@
           Consumers should be able to add additional modules.
           -->
         <dependency>
-            <groupId>io.quarkus.netty</groupId>
-            <artifactId>quarkus-netty-util</artifactId>
-        </dependency>
-        <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-codec</artifactId>
         </dependency>
