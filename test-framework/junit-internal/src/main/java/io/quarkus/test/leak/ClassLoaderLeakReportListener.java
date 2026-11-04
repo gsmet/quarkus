@@ -39,6 +39,10 @@ public class ClassLoaderLeakReportListener implements LauncherSessionListener {
      * Delay in milliseconds before collecting garbage and dumping, to let threads of the last application terminate.
      */
     private static final String DELAY = "io.quarkus.test.heap-dump-on-exit.delay";
+    /**
+     * Number of GC + finalization rounds before dumping.
+     */
+    private static final String GC_ROUNDS = "io.quarkus.test.heap-dump-on-exit.gc-rounds";
     private static final AtomicBoolean REGISTERED = new AtomicBoolean();
 
     @Override
@@ -74,7 +78,14 @@ public class ClassLoaderLeakReportListener implements LauncherSessionListener {
                     Files.createDirectories(dump.getParent());
                 }
                 Files.deleteIfExists(dump);
-                Thread.sleep(Long.getLong(DELAY, 3000L));
+                long delay = Long.getLong(DELAY, 3000L);
+                out.println("[heap-dump-on-exit] pid " + ProcessHandle.current().pid() + ", waiting " + delay + " ms");
+                // the wait ends early when a file named like the dump with a .proceed suffix shows up, so that an
+                // external tool can inspect the live JVM for as long as needed
+                Path proceed = dump.resolveSibling(dump.getFileName() + ".proceed");
+                for (long waited = 0; waited < delay && !Files.exists(proceed); waited += 250) {
+                    Thread.sleep(250);
+                }
                 forceGc();
                 Path threads = dump.resolveSibling(dump.getFileName() + ".threads.txt");
                 Files.writeString(threads, threadReport());
@@ -116,11 +127,12 @@ public class ClassLoaderLeakReportListener implements LauncherSessionListener {
         }
 
         private static void forceGc() {
-            for (int i = 0; i < 5; i++) {
+            int rounds = Integer.getInteger(GC_ROUNDS, 5);
+            for (int i = 0; i < rounds; i++) {
                 System.gc();
                 System.runFinalization();
                 try {
-                    Thread.sleep(200);
+                    Thread.sleep(500);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     return;
