@@ -5,6 +5,10 @@ import java.io.PrintStream;
 import java.lang.management.ManagementFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.platform.launcher.LauncherSession;
@@ -31,6 +35,10 @@ import com.sun.management.HotSpotDiagnosticMXBean;
 public class ClassLoaderLeakReportListener implements LauncherSessionListener {
 
     private static final String DUMP_PATH = "io.quarkus.test.heap-dump-on-exit";
+    /**
+     * Delay in milliseconds before collecting garbage and dumping, to let threads of the last application terminate.
+     */
+    private static final String DELAY = "io.quarkus.test.heap-dump-on-exit.delay";
     private static final AtomicBoolean REGISTERED = new AtomicBoolean();
 
     @Override
@@ -66,7 +74,11 @@ public class ClassLoaderLeakReportListener implements LauncherSessionListener {
                     Files.createDirectories(dump.getParent());
                 }
                 Files.deleteIfExists(dump);
+                Thread.sleep(Long.getLong(DELAY, 3000L));
                 forceGc();
+                Path threads = dump.resolveSibling(dump.getFileName() + ".threads.txt");
+                Files.writeString(threads, threadReport());
+                out.println("[heap-dump-on-exit] thread report written to " + threads);
                 long start = System.nanoTime();
                 ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class).dumpHeap(dump.toString(), true);
                 out.println("[heap-dump-on-exit] heap dump written to " + dump + " in "
@@ -74,7 +86,33 @@ public class ClassLoaderLeakReportListener implements LauncherSessionListener {
             } catch (IOException | RuntimeException e) {
                 out.println("[heap-dump-on-exit] failed");
                 e.printStackTrace(out);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
+        }
+
+        /**
+         * One block per live thread: name, state, daemon flag, the class loader of the thread's class, the context
+         * class loader and the top frames. A thread whose class or context class loader is a closed Quarkus class
+         * loader retains it.
+         */
+        private static String threadReport() {
+            StringBuilder sb = new StringBuilder();
+            Map<Thread, StackTraceElement[]> stacks = Thread.getAllStackTraces();
+            List<Thread> threads = new ArrayList<>(stacks.keySet());
+            threads.sort(Comparator.comparing(Thread::getName));
+            for (Thread thread : threads) {
+                sb.append(thread.getName()).append(" [").append(thread.getState()).append(thread.isDaemon() ? ", daemon" : "")
+                        .append("]\n");
+                sb.append("    class: ").append(thread.getClass().getName()).append(" loaded by ")
+                        .append(thread.getClass().getClassLoader()).append('\n');
+                sb.append("    context class loader: ").append(thread.getContextClassLoader()).append('\n');
+                StackTraceElement[] stack = stacks.get(thread);
+                for (int i = 0; i < Math.min(12, stack.length); i++) {
+                    sb.append("        at ").append(stack[i]).append('\n');
+                }
+            }
+            return sb.toString();
         }
 
         private static void forceGc() {
