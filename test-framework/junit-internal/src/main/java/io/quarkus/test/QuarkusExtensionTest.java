@@ -65,6 +65,8 @@ import io.quarkus.bootstrap.classloading.ClassLoaderEventListener;
 import io.quarkus.bootstrap.classloading.ClassPathElement;
 import io.quarkus.bootstrap.classloading.QuarkusClassLoader;
 import io.quarkus.bootstrap.model.ApplicationModel;
+import io.quarkus.bootstrap.resolver.maven.BootstrapMavenException;
+import io.quarkus.bootstrap.resolver.maven.MavenArtifactResolver;
 import io.quarkus.bootstrap.util.IoUtils;
 import io.quarkus.builder.BuildChainBuilder;
 import io.quarkus.builder.BuildContext;
@@ -103,6 +105,14 @@ public class QuarkusExtensionTest
     private static final String REPRODUCIBILITY_CROSS_JVM_PROPERTY_NAME = "quarkus-internal.test.reproducibility-check.cross-jvm";
     private static final String REPRODUCIBILITY_DUMP_DIR_PROPERTY_NAME = "quarkus-internal.test.reproducibility-check.dump-dir";
     private static final String CACHED_APPLICATION_MODEL_KEY = "cachedApplicationModel";
+    /**
+     * A single {@link MavenArtifactResolver} (and thus a single Maven resolver session cache holding the parsed
+     * artifact descriptors and effective models) shared across all the bootstraps of the JVM.
+     * It only matters for the tests that cannot reuse the cached {@link ApplicationModel}
+     * (e.g. tests forcing or excluding dependencies) and avoids re-reading all the POMs for each of them.
+     */
+    private static MavenArtifactResolver sharedMavenArtifactResolver;
+    private static Path sharedMavenArtifactResolverProjectDir;
 
     private static final Logger rootLogger;
     private Handler[] originalHandlers;
@@ -1168,8 +1178,37 @@ public class QuarkusExtensionTest
         }
         if (existingModel != null) {
             builder.setExistingModel(existingModel);
+        } else {
+            builder.setMavenArtifactResolver(sharedMavenArtifactResolver(projectDir));
         }
         return builder.build().bootstrap();
+    }
+
+    /**
+     * Mirrors what {@code BootstrapAppModelFactory#createBootstrapMavenContext} does for a test bootstrap
+     * (current project resolved from the project directory, workspace discovery enabled, no offline override).
+     */
+    private static synchronized MavenArtifactResolver sharedMavenArtifactResolver(Path projectDir) {
+        if (sharedMavenArtifactResolver != null) {
+            if (!projectDir.equals(sharedMavenArtifactResolverProjectDir)) {
+                throw new IllegalStateException("The shared Maven artifact resolver was initialized for "
+                        + sharedMavenArtifactResolverProjectDir + " but the current project directory is " + projectDir);
+            }
+            return sharedMavenArtifactResolver;
+        }
+        try {
+            MavenArtifactResolver.Builder resolverBuilder = MavenArtifactResolver.builder();
+            Path pom = resolverBuilder.getPomForDirOrNull(projectDir);
+            if (pom != null) {
+                resolverBuilder.setCurrentProject(pom.toString());
+            }
+            resolverBuilder.setWorkspaceDiscovery(true);
+            sharedMavenArtifactResolver = resolverBuilder.build();
+            sharedMavenArtifactResolverProjectDir = projectDir;
+            return sharedMavenArtifactResolver;
+        } catch (BootstrapMavenException e) {
+            throw new RuntimeException("Failed to initialize the shared Maven artifact resolver for " + projectDir, e);
+        }
     }
 
     /**
