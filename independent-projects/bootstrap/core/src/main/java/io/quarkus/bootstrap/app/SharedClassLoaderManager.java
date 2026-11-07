@@ -21,11 +21,13 @@ import io.quarkus.bootstrap.classloading.QuarkusClassLoader;
  * configuration. Subsequent instances with compatible configurations reuse the same class loaders, so classes are
  * loaded only once per distinct configuration.
  * <p>
- * Each shared class loader uses reference counting. When the last reference is released, the class loader is kept
- * open so that the next {@code CuratedApplication} with a compatible configuration can reuse it (tests typically run
- * sequentially so there is usually no overlap). Idle class loaders are closed when a {@code CuratedApplication}
- * requires an incompatible configuration, so that at most one configuration is kept alive at a time when idle,
- * and when the manager itself is {@linkplain #close() closed}.
+ * Each shared class loader uses reference counting. When the last reference is released, the class loader is either
+ * closed right away, or, when the manager retains idle class loaders, kept open so that the next
+ * {@code CuratedApplication} with a compatible configuration can reuse it (tests typically run sequentially so there
+ * is usually no overlap). Idle class loaders are closed when a {@code CuratedApplication} requires an incompatible
+ * configuration, so that at most one configuration is kept alive at a time when idle, and when the manager itself is
+ * {@linkplain #close() closed}. Retaining idle class loaders requires the manager to be closed at the end of the test
+ * run, otherwise the close tasks registered on the class loaders (e.g. shutting down the dev services) never run.
  * <p>
  * Sharing the base runtime class loader is only safe when the application is started in a fresh runtime class loader
  * (i.e. not with a flat test class path). Inputs that cannot be shared are built and closed as with
@@ -40,23 +42,27 @@ public class SharedClassLoaderManager implements ClassLoaderManager, Closeable {
 
     private static final Logger log = Logger.getLogger(SharedClassLoaderManager.class);
 
-    private final Pool<AugmentationClassLoaderInput, AugmentationClassLoaderResult> augmentationClassLoaders = new Pool<>(
-            "augmentation", AugmentationClassLoaderResult::classLoader);
+    private final Pool<AugmentationClassLoaderInput, AugmentationClassLoaderResult> augmentationClassLoaders;
     private final Pool<BaseRuntimeClassLoaderInput, QuarkusClassLoader> baseRuntimeClassLoaders;
 
     /**
-     * Creates a manager sharing the augmentation class loaders only.
+     * Creates a manager sharing the augmentation class loaders only, closing them when their last reference is
+     * released.
      */
     public SharedClassLoaderManager() {
-        this(false);
+        this(false, false);
     }
 
     /**
      * @param shareBaseRuntimeClassLoaders whether the base runtime class loaders should be shared too
+     * @param retainIdleClassLoaders whether the class loaders should be kept open when their last reference is
+     *        released, until an incompatible configuration is requested or the manager is closed
      */
-    public SharedClassLoaderManager(boolean shareBaseRuntimeClassLoaders) {
+    public SharedClassLoaderManager(boolean shareBaseRuntimeClassLoaders, boolean retainIdleClassLoaders) {
+        this.augmentationClassLoaders = new Pool<>("augmentation", AugmentationClassLoaderResult::classLoader,
+                retainIdleClassLoaders);
         this.baseRuntimeClassLoaders = shareBaseRuntimeClassLoaders
-                ? new Pool<>("base runtime", Function.identity())
+                ? new Pool<>("base runtime", Function.identity(), retainIdleClassLoaders)
                 : null;
     }
 
@@ -109,12 +115,14 @@ public class SharedClassLoaderManager implements ClassLoaderManager, Closeable {
 
         private final String kind;
         private final Function<R, QuarkusClassLoader> classLoaderExtractor;
+        private final boolean retainIdle;
         private final List<Entry<I, R>> entries = new ArrayList<>();
         private boolean closed;
 
-        Pool(String kind, Function<R, QuarkusClassLoader> classLoaderExtractor) {
+        Pool(String kind, Function<R, QuarkusClassLoader> classLoaderExtractor, boolean retainIdle) {
             this.kind = kind;
             this.classLoaderExtractor = classLoaderExtractor;
+            this.retainIdle = retainIdle;
         }
 
         synchronized R getOrCreate(I input, Function<I, R> factory) {
@@ -146,9 +154,8 @@ public class SharedClassLoaderManager implements ClassLoaderManager, Closeable {
                 Entry<I, R> entry = iterator.next();
                 if (classLoaderExtractor.apply(entry.result) == classLoader) {
                     entry.refCount--;
-                    if (entry.refCount == 0 && closed) {
-                        log.debugf("Closing shared %s class loader %s (last reference released after close)", kind,
-                                classLoader);
+                    if (entry.refCount == 0 && (closed || !retainIdle)) {
+                        log.debugf("Closing shared %s class loader %s (last reference released)", kind, classLoader);
                         iterator.remove();
                         classLoader.close();
                     } else {

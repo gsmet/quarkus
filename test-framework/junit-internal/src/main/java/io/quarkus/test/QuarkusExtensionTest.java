@@ -1230,7 +1230,7 @@ public class QuarkusExtensionTest
      */
     private static class SharedState implements AutoCloseable {
 
-        private final SharedClassLoaderManager classLoaderManager = new SharedClassLoaderManager(true);
+        private final SharedClassLoaderManager classLoaderManager = new SharedClassLoaderManager(true, true);
         private final Path deploymentDir;
         private QuarkusClassLoader quarkusUnitTestClassLoader;
         private Path quarkusUnitTestClassLoaderTestLocation;
