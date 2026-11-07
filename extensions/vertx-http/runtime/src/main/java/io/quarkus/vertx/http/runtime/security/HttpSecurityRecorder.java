@@ -178,9 +178,11 @@ public class HttpSecurityRecorder {
     }
 
     public RuntimeValue<CORSConfig> prepareHttpSecurityConfiguration(ShutdownContext shutdownContext) {
+        // register the shutdown task first: if the validation fails, the static state must still be cleared
+        // as the runtime classes may be shared with the next application (dev mode restarts, tests)
+        shutdownContext.addShutdownTask(HttpSecurityConfiguration::clear);
         // this is done so that we prepare and validate HTTP Security config before the first incoming request
         var config = HttpSecurityConfiguration.get(httpConfig.getValue(), httpBuildTimeConfig);
-        shutdownContext.addShutdownTask(HttpSecurityConfiguration::clear);
         return new RuntimeValue<>(config.getCorsConfig());
     }
 

@@ -49,6 +49,12 @@ public final class HttpSecurityConfiguration {
 
     private static final Logger LOG = Logger.getLogger(HttpSecurityConfiguration.class);
     private static volatile HttpSecurityConfiguration instance = null;
+    /**
+     * The ArC container the instance was created for. The classes may be shared by several applications
+     * (dev mode restarts, tests sharing the runtime class loader) and the instance may not get cleared when
+     * an application fails to start: an instance created for another container is stale.
+     */
+    private static volatile ArcContainer instanceContainer = null;
     private final RolesMapping rolesMapping;
     private final List<HttpPermissionCarrier> httpPermissions;
     private final Optional<Boolean> basicAuthEnabled;
@@ -223,21 +229,31 @@ public final class HttpSecurityConfiguration {
     // this instance is not in the CDI container to avoid "potential" (I am guessing) circular dependencies
     // during the bean instantiation as we can't be sure what users will inject when they observe the HTTP Security
     static HttpSecurityConfiguration get(VertxHttpConfig httpConfig, VertxHttpBuildTimeConfig httpBuildTimeConfig) {
-        var configInstance = instance;
+        var configInstance = getCurrentInstance();
         if (configInstance == null) {
             return initializeHttpSecurityConfiguration(httpConfig, httpBuildTimeConfig);
         }
         return configInstance;
     }
 
+    private static HttpSecurityConfiguration getCurrentInstance() {
+        var configInstance = instance;
+        if (configInstance != null && instanceContainer != Arc.container()) {
+            // stale instance created for a previous application
+            return null;
+        }
+        return configInstance;
+    }
+
     static void clear() {
         instance = null;
+        instanceContainer = null;
         HttpServerTlsConfig.setConfiguration(new ProgrammaticTlsConfig(null, Optional.empty()));
     }
 
     private static synchronized HttpSecurityConfiguration initializeHttpSecurityConfiguration(VertxHttpConfig httpConfig,
             VertxHttpBuildTimeConfig httpBuildTimeConfig) {
-        if (instance == null) {
+        if (getCurrentInstance() == null) {
             final VertxHttpConfig vertxHttpConfig;
             final VertxHttpBuildTimeConfig vertxHttpBuildTimeConfig;
             if (httpConfig == null) {
@@ -275,6 +291,7 @@ public final class HttpSecurityConfiguration {
                 }
             }
 
+            instanceContainer = Arc.container();
             instance = new HttpSecurityConfiguration(httpSecurity.getRolesMapping(), httpSecurity.getHttpPermissions(),
                     basicAuthEnabled, formAuthEnabled, formPostLocation, mechanisms, vertxHttpConfig,
                     vertxHttpBuildTimeConfig, httpSecurity.getCorsConfig(), httpSecurity.getCsrf());
@@ -477,7 +494,7 @@ public final class HttpSecurityConfiguration {
      */
     public static boolean isNotReady(VertxHttpConfig httpConfig, VertxHttpBuildTimeConfig httpBuildTimeConfig,
             LaunchMode launchMode) {
-        if (instance != null) {
+        if (getCurrentInstance() != null) {
             return false;
         }
 
