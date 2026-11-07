@@ -24,6 +24,7 @@ import liquibase.database.Database;
 import liquibase.database.DatabaseFactory;
 import liquibase.database.jvm.JdbcConnection;
 import liquibase.exception.LiquibaseException;
+import liquibase.parser.ChangeLogParserFactory;
 import liquibase.resource.ClassLoaderResourceAccessor;
 import liquibase.resource.CompositeResourceAccessor;
 import liquibase.resource.DirectoryResourceAccessor;
@@ -136,8 +137,13 @@ public class LiquibaseFactory {
                     database.setDefaultSchemaName(config.defaultSchemaName.get());
                 }
             }
+            ResettableSystemProperties resettableSystemProperties = createResettableSystemProperties();
+            // the change log parsers are singletons that capture the secure parsing setting when they are created:
+            // make sure they are created again with the current settings (the Liquibase classes may be shared
+            // between applications in dev mode and tests)
+            ChangeLogParserFactory.reset();
             Liquibase liquibase = new QuarkusLiquibase(parsedChangeLog, resourceAccessor, database,
-                    createResettableSystemProperties());
+                    resettableSystemProperties);
 
             for (Map.Entry<String, String> entry : config.changeLogParameters.entrySet()) {
                 liquibase.getChangeLogParameters().set(entry.getKey(), entry.getValue());
