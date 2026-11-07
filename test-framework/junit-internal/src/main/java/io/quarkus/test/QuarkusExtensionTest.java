@@ -1214,7 +1214,9 @@ public class QuarkusExtensionTest
         }
         if (existingModel != null) {
             builder.setExistingModel(existingModel);
-        } else {
+        } else if (bootstrapCustomizers.isEmpty()) {
+            // the shared resolver is configured like the default one, bootstrap customizers might have
+            // changed settings (e.g. the local project discovery) that it would not honor
             builder.setMavenArtifactResolver(sharedMavenArtifactResolver(projectDir));
         }
         return builder.build().bootstrap();
