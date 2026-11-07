@@ -406,6 +406,7 @@ public class SecurityCheckRecorder {
             @Override
             public void run() {
                 runtimeConfigReady = false;
+                QuarkusSecurityRolesAllowedConfigBuilder.clearProperties();
             }
         });
     }

@@ -732,7 +732,8 @@ public class SecurityProcessor {
     void recordRuntimeConfigReady(SecurityCheckRecorder recorder, ShutdownContextBuildItem shutdownContextBuildItem,
             LaunchModeBuildItem launchModeBuildItem) {
         recorder.setRuntimeConfigReady();
-        if (launchModeBuildItem.getLaunchMode() == LaunchMode.DEVELOPMENT) {
+        if (launchModeBuildItem.getLaunchMode().isDevOrTest()) {
+            // the runtime classes may be shared with the next application started in the same class loader
             recorder.unsetRuntimeConfigReady(shutdownContextBuildItem);
         }
     }

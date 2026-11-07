@@ -41,6 +41,11 @@ public final class QuarkusSecurityRolesAllowedConfigBuilder implements ConfigBui
         properties.put(transformToKey(key), value);
     }
 
+    static void clearProperties() {
+        // called when the application is shut down, as the next application may share this class
+        properties.clear();
+    }
+
     static String transformToKey(int i) {
         return ROLES_ALLOWED_CONFIG_SOURCE + ".property-" + i;
     }
