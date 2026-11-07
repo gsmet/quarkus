@@ -256,4 +256,18 @@ public class ConfiguredClassLoading implements Serializable {
                 && reloadableArtifacts.equals(other.reloadableArtifacts)
                 && removedResources.equals(other.removedResources);
     }
+
+    /**
+     * Check whether this configuration is compatible with the given configuration
+     * for the purpose of sharing a base runtime class loader.
+     * <p>
+     * All the fields are compared as they all affect the base runtime class loader construction.
+     * <p>
+     * When adding new fields to this class, make sure to include them in this check.
+     */
+    public boolean isCompatibleForBaseRuntimeWith(ConfiguredClassLoading other) {
+        return isCompatibleForAugmentationWith(other)
+                && flatTestClassPath == other.flatTestClassPath
+                && additionalPaths.equals(other.additionalPaths);
+    }
 }

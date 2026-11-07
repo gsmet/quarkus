@@ -2,6 +2,7 @@ package io.quarkus.bootstrap.app;
 
 import java.io.Serializable;
 import java.nio.file.Path;
+import java.util.Objects;
 
 import io.quarkus.paths.PathCollection;
 import io.quarkus.paths.PathList;
@@ -56,6 +57,23 @@ public class AdditionalDependency implements Serializable {
 
     public boolean isHotReloadable() {
         return hotReloadable;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(paths, hotReloadable, forceApplicationArchive);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (!(obj instanceof AdditionalDependency other)) {
+            return false;
+        }
+        return hotReloadable == other.hotReloadable && forceApplicationArchive == other.forceApplicationArchive
+                && Objects.equals(paths, other.paths);
     }
 
     public boolean isForceApplicationArchive() {

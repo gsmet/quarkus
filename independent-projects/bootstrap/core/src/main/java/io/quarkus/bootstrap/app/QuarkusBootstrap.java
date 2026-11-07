@@ -95,7 +95,7 @@ public class QuarkusBootstrap implements Serializable {
     private final boolean defaultFlatTestClassPath;
     private final Collection<ArtifactKey> parentFirstArtifacts;
     private final Supplier<DependencyInfoProvider> depInfoProvider;
-    private final AugmentationClassLoaderManager augmentationClassLoaderManager;
+    private final ClassLoaderManager classLoaderManager;
 
     private QuarkusBootstrap(Builder builder) {
         this.applicationRoot = builder.applicationRoot;
@@ -131,9 +131,9 @@ public class QuarkusBootstrap implements Serializable {
         this.defaultFlatTestClassPath = builder.flatClassPath;
         this.parentFirstArtifacts = builder.parentFirstArtifacts;
         this.depInfoProvider = builder.depInfoProvider;
-        this.augmentationClassLoaderManager = builder.augmentationClassLoaderManager != null
-                ? builder.augmentationClassLoaderManager
-                : DefaultAugmentationClassLoaderManager.getInstance();
+        this.classLoaderManager = builder.classLoaderManager != null
+                ? builder.classLoaderManager
+                : DefaultClassLoaderManager.getInstance();
     }
 
     public CuratedApplication bootstrap() throws BootstrapException {
@@ -289,7 +289,7 @@ public class QuarkusBootstrap implements Serializable {
                 .setDisableClasspathCache(disableClasspathCache)
                 .addClassLoaderEventListeners(classLoadListeners)
                 .setExistingModel(existingModel)
-                .setAugmentationClassLoaderManager(augmentationClassLoaderManager);
+                .setClassLoaderManager(classLoaderManager);
         if (appArtifact != null) {
             builder.setAppArtifact(appArtifact);
         } else {
@@ -313,8 +313,8 @@ public class QuarkusBootstrap implements Serializable {
         return depInfoProvider;
     }
 
-    public AugmentationClassLoaderManager getAugmentationClassLoaderManager() {
-        return augmentationClassLoaderManager;
+    public ClassLoaderManager getClassLoaderManager() {
+        return classLoaderManager;
     }
 
     public static class Builder {
@@ -351,7 +351,7 @@ public class QuarkusBootstrap implements Serializable {
         boolean auxiliaryApplication;
         List<ArtifactKey> parentFirstArtifacts = new ArrayList<>();
         Supplier<DependencyInfoProvider> depInfoProvider;
-        AugmentationClassLoaderManager augmentationClassLoaderManager;
+        ClassLoaderManager classLoaderManager;
 
         public Builder() {
         }
@@ -584,9 +584,8 @@ public class QuarkusBootstrap implements Serializable {
             return this;
         }
 
-        public Builder setAugmentationClassLoaderManager(
-                AugmentationClassLoaderManager augmentationClassLoaderManager) {
-            this.augmentationClassLoaderManager = augmentationClassLoaderManager;
+        public Builder setClassLoaderManager(ClassLoaderManager classLoaderManager) {
+            this.classLoaderManager = classLoaderManager;
             return this;
         }
 

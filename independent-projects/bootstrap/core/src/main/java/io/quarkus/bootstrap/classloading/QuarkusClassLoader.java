@@ -13,6 +13,7 @@ import java.net.URL;
 import java.security.ProtectionDomain;
 import java.sql.Driver;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -50,7 +51,7 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
 
     protected static final String META_INF_SERVICES = "META-INF/services/";
 
-    private final CuratedApplication curatedApplication;
+    private volatile CuratedApplication curatedApplication;
     private StartupAction startupAction;
 
     static {
@@ -233,11 +234,62 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
             throw new IllegalStateException("Classloader is not resettable");
         }
         synchronized (this) {
+            if (log.isDebugEnabled()) {
+                Set<String> staleClasses = findStaleClasses(generatedResources, transformedClasses);
+                if (!staleClasses.isEmpty()) {
+                    log.debugf("Classes already loaded by %s differ from the new generated or transformed resources,"
+                            + " the already loaded versions will be used: %s", this, staleClasses);
+                }
+            }
             // we don't want the previous MemoryClassPathElement to leak as a key of protectionDomains
             protectionDomains.remove(this.transformedClasses);
             this.transformedClasses = new MemoryClassPathElement(transformedClasses, true);
             resettableElement.reset(generatedResources);
             classPathResourceIndex = null;
+        }
+    }
+
+    /**
+     * Finds the classes already loaded by this class loader that would be defined differently by a
+     * {@link #reset(Map, Map)} with the given resources.
+     * <p>
+     * A class that was already loaded by this class loader cannot be redefined by a reset: the already loaded
+     * version will keep being used. This is fine as long as the new resources are the same as the ones used to
+     * load the class, which is the common case (e.g. restarting in dev mode). Otherwise, the application would run
+     * with stale classes, which is what this method allows to detect.
+     *
+     * @param generatedResources the generated resources the class loader would be reset with
+     * @param transformedClasses the transformed classes the class loader would be reset with
+     * @return the names of the classes that are already loaded with a different version
+     */
+    public Set<String> findStaleClasses(Map<String, byte[]> generatedResources, Map<String, byte[]> transformedClasses) {
+        ensureOpen();
+        Set<String> staleClasses = new LinkedHashSet<>();
+        synchronized (this) {
+            collectStaleClasses(this.transformedClasses, transformedClasses, staleClasses);
+            collectStaleClasses(resettableElement, generatedResources, staleClasses);
+        }
+        return staleClasses;
+    }
+
+    private void collectStaleClasses(MemoryClassPathElement previous, Map<String, byte[]> resources,
+            Set<String> staleClasses) {
+        for (Map.Entry<String, byte[]> entry : resources.entrySet()) {
+            String resourceName = entry.getKey();
+            if (!resourceName.endsWith(".class")) {
+                continue;
+            }
+            String className = ClassLoaderHelper.fromResourceNameToClassName(resourceName);
+            if (findLoadedClass(className) == null) {
+                continue;
+            }
+            // the class may have been loaded from a regular element (e.g. a library class that was not transformed
+            // before) or from a previous version of the resettable or transformed elements
+            ClassPathResource previousResource = previous == null ? null : previous.getResource(resourceName);
+            byte[] previousData = previousResource == null ? null : previousResource.getData();
+            if (previousData == null || !Arrays.equals(previousData, entry.getValue())) {
+                staleClasses.add(className);
+            }
         }
     }
 
@@ -866,6 +918,15 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
 
     public CuratedApplication getCuratedApplication() {
         return curatedApplication;
+    }
+
+    /**
+     * Sets the {@link CuratedApplication} currently using this class loader.
+     * <p>
+     * A shared base runtime class loader is used by multiple {@link CuratedApplication}s over time.
+     */
+    public void setCuratedApplication(CuratedApplication curatedApplication) {
+        this.curatedApplication = curatedApplication;
     }
 
     @Override

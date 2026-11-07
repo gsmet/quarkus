@@ -41,7 +41,7 @@ import org.junit.platform.commons.support.HierarchyTraversalMode;
 import org.junit.platform.launcher.PostDiscoveryFilter;
 
 import io.quarkus.bootstrap.app.CuratedApplication;
-import io.quarkus.bootstrap.app.SharedAugmentationClassLoaderManager;
+import io.quarkus.bootstrap.app.SharedClassLoaderManager;
 import io.quarkus.bootstrap.app.StartupAction;
 import io.quarkus.bootstrap.classloading.QuarkusClassLoader;
 import io.quarkus.runtime.JVMUnsafeWarningsControl;
@@ -77,9 +77,10 @@ public final class FacadeClassLoader extends ClassLoader implements Closeable {
     // We re-use curated applications across application starts; be careful what classloader this class is loaded with
     private static final Map<String, CuratedApplication> CURATED_APPLICATIONS = new HashMap<>();
 
-    // Shared augmentation class loader manager: allows multiple profiles to share a single
-    // augmentation class loader, reducing Metaspace memory usage when running tests with many profiles
-    private static final SharedAugmentationClassLoaderManager SHARED_AUGMENTATION_CLASS_LOADER_MANAGER = new SharedAugmentationClassLoaderManager();
+    // Shared class loader manager: allows multiple profiles to share a single
+    // augmentation class loader, reducing Metaspace memory usage when running tests with many profiles.
+    // The base runtime class loaders are not shared as each profile has its own configuration.
+    private static final SharedClassLoaderManager SHARED_CLASS_LOADER_MANAGER = new SharedClassLoaderManager();
 
     // JUnit discovery is single threaded, so no need for concurrency on this map
     private final Map<String, QuarkusClassLoader> runtimeClassLoaders = new HashMap<>();
@@ -585,7 +586,7 @@ public final class FacadeClassLoader extends ClassLoader implements Closeable {
             String displayName = DISPLAY_NAME_PREFIX + key;
             // TODO should we use clonedBuilder here, like TestSupport does?
             curatedApplication = AppMakerHelper.makeCuratedApplication(requiredTestClass, additionalPaths, displayName,
-                    isAuxiliaryApplication, SHARED_AUGMENTATION_CLASS_LOADER_MANAGER);
+                    isAuxiliaryApplication, SHARED_CLASS_LOADER_MANAGER);
             CURATED_APPLICATIONS.put(key, curatedApplication);
         }
 

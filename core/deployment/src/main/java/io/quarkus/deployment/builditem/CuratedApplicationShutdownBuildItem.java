@@ -13,7 +13,8 @@ import io.quarkus.builder.item.SimpleBuildItem;
  * <p>
  * For production applications, this will be at the end of the Maven/Gradle build. For dev mode applications, this will be
  * when dev mode shuts down. For tests, it will generally be at the end of the test run. However, for continuous testing this
- * will be when the outer dev mode process shuts down. For extension unit tests, this will usually be the end of the test.
+ * will be when the outer dev mode process shuts down. For extension unit tests, this will be when the augmentation class
+ * loader (which may be shared by all the tests of the run) is closed.
  */
 public final class CuratedApplicationShutdownBuildItem extends SimpleBuildItem {
 

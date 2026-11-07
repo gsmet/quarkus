@@ -97,7 +97,7 @@ public class StartupActionImpl implements StartupAction {
         this.additionalConfigBuildItems = buildResult.consumeMulti(DevServicesAdditionalConfigBuildItem.class);
         this.deploymentClassLoader = buildResult.getDeploymentClassLoader();
 
-        QuarkusClassLoader baseClassLoader = curatedApplication.getOrCreateBaseRuntimeClassLoader();
+        QuarkusClassLoader baseClassLoader;
         QuarkusClassLoader runtimeClassLoader;
 
         //so we have some differences between dev and test mode here.
@@ -107,10 +107,11 @@ public class StartupActionImpl implements StartupAction {
         Map<String, byte[]> resources = new HashMap<>(extractGeneratedResources(buildResult, true));
         if (curatedApplication.isFlatClassPath()) {
             resources.putAll(extractGeneratedResources(buildResult, false));
-            baseClassLoader.reset(resources, transformedClasses);
+            baseClassLoader = curatedApplication.resetBaseRuntimeClassLoader(resources, transformedClasses);
             runtimeClassLoader = baseClassLoader;
         } else {
-            baseClassLoader.reset(extractGeneratedResources(buildResult, false), transformedClasses);
+            baseClassLoader = curatedApplication.resetBaseRuntimeClassLoader(extractGeneratedResources(buildResult, false),
+                    transformedClasses);
             // TODO Need to do recreations in JUnitTestRunner for dev mode case
             Path tempApplicationProperties = ApplicationPropertiesUtils
                     .createTempApplicationProperties(STARTUP_OVERRIDE.getName());
