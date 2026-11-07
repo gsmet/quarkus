@@ -480,8 +480,11 @@ class SmallRyeHealthProcessor {
                 .require(BeanContainer.class)
                 .require(SmallRyeHealthRuntimeConfig.class)
                 .afterBuildItem(SyntheticBeansRuntimeInitBuildItem.class)
-                .onStart((ctx, container, runtimeConfig) -> SmallRyeHealthRecorder
-                        .processSmallRyeHealthRuntimeConfiguration(container, runtimeConfig, buildFixedConfig));
+                .onStart((ctx, container, runtimeConfig) -> {
+                    SmallRyeHealthRecorder.processSmallRyeHealthRuntimeConfiguration(container, runtimeConfig,
+                            buildFixedConfig);
+                    ctx.onStop(SmallRyeHealthRecorder::resetHealthRegistries);
+                });
     }
 
     // Replace health URL in static files
