@@ -4,6 +4,7 @@ import static io.quarkus.test.ExportUtil.APPLICATION_PROPERTIES;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -61,6 +62,7 @@ import io.quarkus.bootstrap.app.AdditionalDependency;
 import io.quarkus.bootstrap.app.CuratedApplication;
 import io.quarkus.bootstrap.app.QuarkusBootstrap;
 import io.quarkus.bootstrap.app.RunningQuarkusApplication;
+import io.quarkus.bootstrap.app.SharedClassLoaderManager;
 import io.quarkus.bootstrap.classloading.ClassLoaderEventListener;
 import io.quarkus.bootstrap.classloading.ClassPathElement;
 import io.quarkus.bootstrap.classloading.QuarkusClassLoader;
@@ -105,6 +107,7 @@ public class QuarkusExtensionTest
     private static final String REPRODUCIBILITY_CROSS_JVM_PROPERTY_NAME = "quarkus-internal.test.reproducibility-check.cross-jvm";
     private static final String REPRODUCIBILITY_DUMP_DIR_PROPERTY_NAME = "quarkus-internal.test.reproducibility-check.dump-dir";
     private static final String CACHED_APPLICATION_MODEL_KEY = "cachedApplicationModel";
+    private static final String SHARED_STATE_KEY = QuarkusExtensionTest.class.getName() + ".sharedState";
     /**
      * A single {@link MavenArtifactResolver} (and thus a single Maven resolver session cache holding the parsed
      * artifact descriptors and effective models) shared across all the bootstraps of the JVM.
@@ -124,7 +127,9 @@ public class QuarkusExtensionTest
 
     protected boolean started = false;
 
-    private Path deploymentDir;
+    private SharedState sharedState;
+    private Path applicationRoot;
+    private Path additionalDependenciesDir;
     private Consumer<Throwable> assertException;
     private Supplier<JavaArchive> archiveProducer;
     private List<JavaArchive> additionalDependencies = new ArrayList<>();
@@ -145,6 +150,7 @@ public class QuarkusExtensionTest
     private CuratedApplication curatedApplication;
     private RunningQuarkusApplication runningQuarkusApplication;
     private QuarkusClassLoader quarkusUnitTestClassLoader;
+    private boolean quarkusUnitTestClassLoaderShared;
     private ClassLoader originalClassLoader;
     private List<Dependency> forcedDependencies = Collections.emptyList();
     private Set<ArtifactKey> excludedDependencies = Collections.emptySet();
@@ -375,7 +381,7 @@ public class QuarkusExtensionTest
         return this;
     }
 
-    private void exportArchives(Path deploymentDir, Class<?> testClass) {
+    private void exportArchives(Class<?> testClass) {
         try {
             JavaArchive archive = getArchiveProducerOrDefault();
             Class<?> c = testClass;
@@ -396,10 +402,18 @@ public class QuarkusExtensionTest
                 ExportUtil.mergeCustomApplicationProperties(archive, customApplicationProperties);
             }
 
-            archive.as(ExplodedExporter.class).exportExplodedInto(deploymentDir.resolve(APP_ROOT).toFile());
+            // the application root is the same for all the tests of the JVM (which allows sharing the base runtime
+            // class loader across tests), make sure we start from a clean slate
+            FileUtil.deleteDirectory(applicationRoot);
+            archive.as(ExplodedExporter.class).exportExplodedInto(applicationRoot.toFile());
 
-            for (JavaArchive dependency : additionalDependencies) {
-                dependency.as(ExplodedExporter.class).exportExplodedInto(deploymentDir.resolve(dependency.getName()).toFile());
+            if (!additionalDependencies.isEmpty()) {
+                // additional dependencies end up in the base runtime class loader so they must have a unique path
+                additionalDependenciesDir = Files.createTempDirectory(sharedState.deploymentDir, "additional-dependencies");
+                for (JavaArchive dependency : additionalDependencies) {
+                    dependency.as(ExplodedExporter.class)
+                            .exportExplodedInto(additionalDependenciesDir.resolve(dependency.getName()).toFile());
+                }
             }
 
             //debugging code
@@ -721,9 +735,14 @@ public class QuarkusExtensionTest
         Class<?> testClass = extensionContext.getRequiredTestClass();
 
         try {
-            deploymentDir = Files.createTempDirectory("quarkus-unit-test");
+            sharedState = (SharedState) store.get(SHARED_STATE_KEY);
+            if (sharedState == null) {
+                sharedState = new SharedState();
+                store.put(SHARED_STATE_KEY, sharedState);
+            }
+            applicationRoot = sharedState.deploymentDir.resolve(APP_ROOT);
 
-            exportArchives(deploymentDir, testClass);
+            exportArchives(testClass);
 
             List<Consumer<BuildChainBuilder>> customizers = new ArrayList<>(buildChainCustomizers);
 
@@ -772,11 +791,20 @@ public class QuarkusExtensionTest
                 final Path testLocation = PathTestHelper.getTestClassesLocation(testClass);
                 final Path projectDir = Path.of("").normalize().toAbsolutePath();
                 if (!allowTestClassOutsideDeployment) {
-                    quarkusUnitTestClassLoader = QuarkusClassLoader
-                            .builder("QuarkusExtensionTest ClassLoader for " + extensionContext.getDisplayName(),
-                                    getClass().getClassLoader(), false)
-                            .addClassLoaderEventListeners(this.classLoadListeners)
-                            .addBannedElement(ClassPathElement.fromPath(testLocation, true)).build();
+                    if (classLoadListeners.isEmpty()) {
+                        // this class loader is the parent of the augmentation and base runtime class loaders:
+                        // sharing it is a prerequisite to sharing them across tests
+                        quarkusUnitTestClassLoader = sharedState.getOrCreateQuarkusUnitTestClassLoader(testLocation,
+                                getClass().getClassLoader());
+                        quarkusUnitTestClassLoaderShared = true;
+                    } else {
+                        quarkusUnitTestClassLoader = QuarkusClassLoader
+                                .builder("QuarkusExtensionTest ClassLoader for " + extensionContext.getDisplayName(),
+                                        getClass().getClassLoader(), false)
+                                .addClassLoaderEventListeners(this.classLoadListeners)
+                                .addBannedElement(ClassPathElement.fromPath(testLocation, true)).build();
+                        quarkusUnitTestClassLoaderShared = false;
+                    }
                 }
 
                 String reproducibilityDumpDir = System.getProperty(REPRODUCIBILITY_DUMP_DIR_PROPERTY_NAME);
@@ -937,7 +965,9 @@ public class QuarkusExtensionTest
             Thread.currentThread().setContextClassLoader(originalClassLoader);
             originalClassLoader = null;
             if (quarkusUnitTestClassLoader != null) {
-                quarkusUnitTestClassLoader.close();
+                if (!quarkusUnitTestClassLoaderShared) {
+                    quarkusUnitTestClassLoader.close();
+                }
                 quarkusUnitTestClassLoader = null;
             }
             if (timeoutTask != null) {
@@ -948,8 +978,13 @@ public class QuarkusExtensionTest
                 timeoutTimer.cancel();
                 timeoutTimer = null;
             }
-            if (deploymentDir != null) {
-                FileUtil.deleteDirectory(deploymentDir);
+            if (applicationRoot != null) {
+                FileUtil.deleteDirectory(applicationRoot);
+                applicationRoot = null;
+            }
+            if (additionalDependenciesDir != null) {
+                FileUtil.deleteDirectory(additionalDependenciesDir);
+                additionalDependenciesDir = null;
             }
 
             if (afterAllCustomizer != null) {
@@ -1151,7 +1186,7 @@ public class QuarkusExtensionTest
             ApplicationModel existingModel) throws Exception {
         QuarkusBootstrap.Builder builder = QuarkusBootstrap.builder()
                 .setBaseName(extensionContext.getDisplayName() + " (QuarkusExtensionTest)")
-                .setApplicationRoot(deploymentDir.resolve(APP_ROOT))
+                .setApplicationRoot(applicationRoot)
                 .setMode(QuarkusBootstrap.Mode.TEST)
                 .setTest(true)
                 .addExcludedPath(testLocation)
@@ -1159,10 +1194,11 @@ public class QuarkusExtensionTest
                 .setTargetDirectory(PathTestHelper.getProjectBuildDir(projectDir, testLocation))
                 .setFlatClassPath(flatClassPath)
                 .setForcedDependencies(forcedDependencies)
-                .setExcludedDependencies(excludedDependencies);
+                .setExcludedDependencies(excludedDependencies)
+                .setClassLoaderManager(sharedState.classLoaderManager);
         for (JavaArchive dependency : additionalDependencies) {
             builder.addAdditionalApplicationArchive(
-                    new AdditionalDependency(deploymentDir.resolve(dependency.getName()), false, true));
+                    new AdditionalDependency(additionalDependenciesDir.resolve(dependency.getName()), false, true));
         }
         if (hasDependencyCustomizations()) {
             //if we have forced/excluded dependencies we can't use the cache
@@ -1182,6 +1218,52 @@ public class QuarkusExtensionTest
             builder.setMavenArtifactResolver(sharedMavenArtifactResolver(projectDir));
         }
         return builder.build().bootstrap();
+    }
+
+    /**
+     * The state shared by all the tests of the JVM, closed at the end of the test run.
+     * <p>
+     * The augmentation and base runtime class loaders are shared across tests (as long as they are compatible, see
+     * {@link SharedClassLoaderManager}) to avoid loading the same classes again and again. For that, the inputs of
+     * these class loaders must be the same across tests: the parent class loader (which bans the test classes) and
+     * the application root (whose content changes for each test but whose path is the same).
+     */
+    private static class SharedState implements AutoCloseable {
+
+        private final SharedClassLoaderManager classLoaderManager = new SharedClassLoaderManager(true);
+        private final Path deploymentDir;
+        private QuarkusClassLoader quarkusUnitTestClassLoader;
+        private Path quarkusUnitTestClassLoaderTestLocation;
+
+        SharedState() throws IOException {
+            deploymentDir = Files.createTempDirectory("quarkus-unit-test");
+        }
+
+        synchronized QuarkusClassLoader getOrCreateQuarkusUnitTestClassLoader(Path testLocation, ClassLoader parent) {
+            if (quarkusUnitTestClassLoader != null) {
+                if (!testLocation.equals(quarkusUnitTestClassLoaderTestLocation) || parent != quarkusUnitTestClassLoader
+                        .getParent()) {
+                    throw new IllegalStateException("The shared QuarkusExtensionTest class loader was initialized for "
+                            + quarkusUnitTestClassLoaderTestLocation + " but the current test location is " + testLocation);
+                }
+                return quarkusUnitTestClassLoader;
+            }
+            quarkusUnitTestClassLoader = QuarkusClassLoader
+                    .builder("QuarkusExtensionTest ClassLoader (shared)", parent, false)
+                    .addBannedElement(ClassPathElement.fromPath(testLocation, true)).build();
+            quarkusUnitTestClassLoaderTestLocation = testLocation;
+            return quarkusUnitTestClassLoader;
+        }
+
+        @Override
+        public synchronized void close() throws IOException {
+            classLoaderManager.close();
+            if (quarkusUnitTestClassLoader != null) {
+                quarkusUnitTestClassLoader.close();
+                quarkusUnitTestClassLoader = null;
+            }
+            FileUtil.deleteDirectory(deploymentDir);
+        }
     }
 
     /**
