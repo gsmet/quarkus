@@ -237,7 +237,10 @@ public class BeanGenerator extends AbstractGenerator {
 
         boolean isApplicationClass = applicationClassPredicate.test(clazz.name())
                 || bean.isForceApplicationClass()
-                || bean.hasBoundDecoratorMatching(applicationClassPredicate);
+                || bean.hasBoundDecoratorMatching(applicationClassPredicate)
+                // the generated code of a bean that can be inactive lists the injection points of the whole deployment
+                // that resolve to the bean: it depends on the application, not just on the bean
+                || bean.canBeInactive();
         ResourceClassOutput classOutput = new ResourceClassOutput(isApplicationClass,
                 name -> name.equals(generatedName) ? SpecialType.BEAN : null, generateSources);
 

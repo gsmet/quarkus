@@ -201,6 +201,11 @@ public class StartupBuildSteps {
                 .observedType(StartupEvent.class);
         configurator.id(id);
         configurator.priority(priority);
+        if (btBean.canBeInactive()) {
+            // the generated code depends on the injection points of the whole deployment (see below):
+            // it depends on the application, not just on the bean
+            configurator.forceApplicationClass();
+        }
         configurator.notify(ng -> {
             BlockCreator b0 = ng.notifyMethod();
 
