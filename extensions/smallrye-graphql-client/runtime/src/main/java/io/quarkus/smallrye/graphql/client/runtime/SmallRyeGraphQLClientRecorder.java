@@ -110,6 +110,9 @@ public class SmallRyeGraphQLClientRecorder {
         shutdown.addShutdownTask(() -> {
             tlsConfigNameToVertxHttpClients.clear();
             typesafeInstanceToTlsInfo.clear();
+            // the client configurations are kept in a static singleton that would otherwise be reused by the next
+            // application started with the same classes (dev mode restarts, tests sharing the runtime class loader)
+            GraphQLClientsConfiguration.clear();
         });
     }
 
