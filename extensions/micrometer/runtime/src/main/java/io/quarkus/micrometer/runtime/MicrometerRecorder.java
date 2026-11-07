@@ -1,5 +1,6 @@
 package io.quarkus.micrometer.runtime;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -159,11 +160,9 @@ public class MicrometerRecorder {
         context.addShutdownTask(new Runnable() {
             @Override
             public void run() {
-                if (LaunchMode.current() == LaunchMode.DEVELOPMENT) {
+                if (LaunchMode.current().isDevOrTest()) {
                     // Drop existing meters (recreated on next use)
-                    for (Meter meter : Metrics.globalRegistry.getMeters()) {
-                        Metrics.globalRegistry.remove(meter);
-                    }
+                    removeGlobalRegistryMeters();
                 }
                 // iterate over defensive copy to avoid ConcurrentModificationException
                 for (MeterRegistry meterRegistry : new ArrayList<>(Metrics.globalRegistry.getRegistries())) {
@@ -180,6 +179,18 @@ public class MicrometerRecorder {
                 }
             }
         });
+        if (LaunchMode.current().isDevOrTest()) {
+            // The global registry is a static singleton that may be reused by the next application
+            // (dev mode restarts, tests sharing the runtime class loader): once everything else is shut down,
+            // drop the meters recorded in the meantime (e.g. closed connections) and the configuration
+            context.addLastShutdownTask(new Runnable() {
+                @Override
+                public void run() {
+                    removeGlobalRegistryMeters();
+                    resetGlobalRegistryConfiguration();
+                }
+            });
+        }
     }
 
     private void populateMeterFilters(Set<Class<? extends MeterRegistry>> registryClasses, BeanManager beanManager,
@@ -234,6 +245,29 @@ public class MicrometerRecorder {
                     meterFilters.add(filter);
                 }
             }
+        }
+    }
+
+    private static void removeGlobalRegistryMeters() {
+        for (Meter meter : Metrics.globalRegistry.getMeters()) {
+            Metrics.globalRegistry.remove(meter);
+        }
+    }
+
+    /**
+     * The global registry is a static singleton: the meter filters registered by the application must be dropped
+     * when it shuts down, otherwise they would still apply to the next application using the same classes
+     * (dev mode restarts, tests sharing the runtime class loader).
+     * There is no API to remove them so we have to resort to reflection. The meter listeners are left untouched as
+     * the composite registry relies on them to propagate the meters to the registries it is composed of.
+     */
+    private static void resetGlobalRegistryConfiguration() {
+        try {
+            Field filtersField = MeterRegistry.class.getDeclaredField("filters");
+            filtersField.setAccessible(true);
+            filtersField.set(Metrics.globalRegistry, new MeterFilter[0]);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            log.warn("Unable to reset the configuration of the global meter registry", e);
         }
     }
 
