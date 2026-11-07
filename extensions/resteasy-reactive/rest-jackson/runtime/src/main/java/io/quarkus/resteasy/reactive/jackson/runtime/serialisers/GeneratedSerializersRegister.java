@@ -22,13 +22,25 @@ import tools.jackson.databind.ser.std.StdSerializer;
 @Singleton
 public class GeneratedSerializersRegister implements JsonMapperBuilderCustomizer {
 
-    private static final SimpleModule mappingModule = new SimpleModule();
-    private static final ExactSerializers serializers = new ExactSerializers();
+    private static volatile SimpleModule mappingModule;
+    private static volatile ExactSerializers serializers;
 
     static {
+        reset();
+    }
+
+    /**
+     * Drops the registered serializers and deserializers, they are registered again when the application starts.
+     * Required as this class may be shared by several applications (dev mode restarts, tests).
+     */
+    public static void reset() {
+        ExactSerializers newSerializers = new ExactSerializers();
+        SimpleModule newModule = new SimpleModule();
         // Use a custom SimpleSerializers to use a json serializer only if it has been generated for that
         // exact class and not one of its sublclasses. This is already the default behaviour for deserializers.
-        mappingModule.setSerializers(serializers);
+        newModule.setSerializers(newSerializers);
+        serializers = newSerializers;
+        mappingModule = newModule;
     }
 
     @Override

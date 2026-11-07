@@ -441,8 +441,11 @@ public class ResteasyReactiveJacksonProcessor {
         if (!generatedSerializers.isEmpty() || !generatedDeserializers.isEmpty()) {
             serviceRegistrar.forService("io.quarkus.resteasy.reactive.jackson.generated-serializers")
                     .atPhase(Phase.STATIC_INIT)
-                    .onStart(ctx -> ResteasyReactiveServerJacksonRecorder.registerGeneratedSerializers(generatedSerializers,
-                            generatedDeserializers));
+                    .onStart(ctx -> {
+                        ResteasyReactiveServerJacksonRecorder.registerGeneratedSerializers(generatedSerializers,
+                                generatedDeserializers);
+                        ctx.onStop(GeneratedSerializersRegister::reset);
+                    });
         }
     }
 

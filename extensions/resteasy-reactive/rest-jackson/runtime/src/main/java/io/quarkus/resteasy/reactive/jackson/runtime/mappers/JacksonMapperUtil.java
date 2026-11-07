@@ -168,12 +168,13 @@ public class JacksonMapperUtil {
     }
 
     public static boolean includeSecureField(String[] rolesAllowed) {
-        SecurityIdentity securityIdentity = RolesAllowedHolder.SECURITY_IDENTITY;
+        RolesAllowedHolder holder = RolesAllowedHolder.get();
+        SecurityIdentity securityIdentity = holder.securityIdentity;
         if (securityIdentity == null) {
             return false;
         }
 
-        RolesAllowedConfigExpStorage rolesConfigExpStorage = RolesAllowedHolder.ROLES_ALLOWED_CONFIG_EXP_STORAGE;
+        RolesAllowedConfigExpStorage rolesConfigExpStorage = holder.rolesAllowedConfigExpStorage;
         for (String role : rolesAllowed) {
             if (rolesConfigExpStorage != null) {
                 // role config expression => resolved roles
@@ -276,27 +277,48 @@ public class JacksonMapperUtil {
         return rootType;
     }
 
-    private static class RolesAllowedHolder {
+    /**
+     * Caches the beans looked up from the current ArC container. The cache is invalidated when the container
+     * changes, as this class may be shared by several applications (dev mode restarts, tests sharing the runtime
+     * class loader).
+     */
+    private static final class RolesAllowedHolder {
 
-        private static final ArcContainer ARC_CONTAINER = Arc.container();
+        private static volatile RolesAllowedHolder current;
 
-        private static final SecurityIdentity SECURITY_IDENTITY = createSecurityIdentity();
+        private final ArcContainer arcContainer;
+        private final SecurityIdentity securityIdentity;
+        private final RolesAllowedConfigExpStorage rolesAllowedConfigExpStorage;
 
-        private static final RolesAllowedConfigExpStorage ROLES_ALLOWED_CONFIG_EXP_STORAGE = createRolesAllowedConfigExpStorage();
+        private RolesAllowedHolder(ArcContainer arcContainer) {
+            this.arcContainer = arcContainer;
+            this.securityIdentity = createSecurityIdentity(arcContainer);
+            this.rolesAllowedConfigExpStorage = createRolesAllowedConfigExpStorage(arcContainer);
+        }
 
-        private static SecurityIdentity createSecurityIdentity() {
-            if (ARC_CONTAINER == null) {
+        static RolesAllowedHolder get() {
+            ArcContainer arcContainer = Arc.container();
+            RolesAllowedHolder holder = current;
+            if (holder == null || holder.arcContainer != arcContainer) {
+                holder = new RolesAllowedHolder(arcContainer);
+                current = holder;
+            }
+            return holder;
+        }
+
+        private static SecurityIdentity createSecurityIdentity(ArcContainer arcContainer) {
+            if (arcContainer == null) {
                 return null;
             }
-            InstanceHandle<SecurityIdentity> instance = ARC_CONTAINER.instance(SecurityIdentity.class);
+            InstanceHandle<SecurityIdentity> instance = arcContainer.instance(SecurityIdentity.class);
             return instance.isAvailable() ? instance.get() : null;
         }
 
-        private static RolesAllowedConfigExpStorage createRolesAllowedConfigExpStorage() {
-            if (ARC_CONTAINER == null) {
+        private static RolesAllowedConfigExpStorage createRolesAllowedConfigExpStorage(ArcContainer arcContainer) {
+            if (arcContainer == null) {
                 return null;
             }
-            InstanceHandle<RolesAllowedConfigExpStorage> rolesAllowedConfigExpStorage = ARC_CONTAINER
+            InstanceHandle<RolesAllowedConfigExpStorage> rolesAllowedConfigExpStorage = arcContainer
                     .instance(RolesAllowedConfigExpStorage.class);
             return rolesAllowedConfigExpStorage.isAvailable() ? rolesAllowedConfigExpStorage.get() : null;
         }
